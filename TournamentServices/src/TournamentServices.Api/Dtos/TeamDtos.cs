@@ -6,6 +6,6 @@ public record CreateTeamDto(string Name);
 
 public record UpdateTeamDto(string Name);
 
-// Anteriores
+// Legacy
 public record AssignTeamsRequest(List<TeamDto> Teams);
 public record TeamResponse(string Id, string Name);
