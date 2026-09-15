@@ -44,7 +44,7 @@ TournamentServices/
         ├── Validators/               # Unit tests for FluentValidation rules
         │   └── CreateTournamentValidatorTests.cs
         └── TournamentServices.Api.Tests.csproj
-
+```
 ## Getting Started
 
 ### Prerequisites
