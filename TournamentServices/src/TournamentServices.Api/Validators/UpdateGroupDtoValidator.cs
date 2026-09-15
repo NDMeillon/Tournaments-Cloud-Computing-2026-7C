@@ -1,0 +1,14 @@
+using FluentValidation;
+using TournamentServices.Api.Dtos;
+
+namespace TournamentServices.Api.Validators;
+
+public class UpdateGroupDtoValidator : AbstractValidator<UpdateGroupDto>
+{
+    public UpdateGroupDtoValidator()
+    {
+        RuleFor(x => x.Name)
+            .NotEmpty().WithMessage("Group name is required.")
+            .MaximumLength(100).WithMessage("Group name cannot exceed 100 characters.");
+    }
+}
