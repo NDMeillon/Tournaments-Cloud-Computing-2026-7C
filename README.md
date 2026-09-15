@@ -17,6 +17,7 @@ TournamentServices/
 │   └── TournamentServices.Api/
 │       ├── Dtos/                     # Request and response contract records
 │       │   ├── GroupDtos.cs
+|       |   ├── MatchDtos.cs
 │       │   ├── TeamDtos.cs
 │       │   └── TournamentDtos.cs
 │       ├── Extensions/               # Endpoint filters and pipeline extensions
@@ -26,9 +27,6 @@ TournamentServices/
 │       ├── Routes/                   # Minimal API route definitions and handlers
 │       │   └── TournamentRoutes.cs
 │       ├── Validators/               # FluentValidation request validators
-│       │   ├── AssignGroupsRequestValidator.cs
-│       │   ├── AssignTeamsRequestValidator.cs
-│       │   └── CreateTournamentRequestValidator.cs
 │       ├── appsettings.json
 │       ├── Program.cs
 │       ├── TournamentServices.Api.csproj
@@ -36,6 +34,7 @@ TournamentServices/
 └── tests/
     └── TournamentServices.Api.Tests/
         ├── Routes/                   # Integration tests using WebApplicationFactory
+        |   ├── TeamRoutesTests.cs
         │   └── TournamentRoutesTests.cs
         ├── Validators/               # Unit tests for FluentValidation rules
         │   └── CreateTournamentValidatorTests.cs
