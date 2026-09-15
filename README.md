@@ -12,6 +12,38 @@ A lightweight Tournament Management REST API built with C# and .NET Minimal APIs
 * **Testing:** xUnit, `Microsoft.AspNetCore.Mvc.Testing`, FluentAssertions
 
 ---
+## Solution Structure
+
+```text
+TournamentServices/
+├── TournamentServices.sln
+├── src/
+│   └── TournamentServices.Api/
+│       ├── Dtos/                     # Request and response contract records
+│       │   ├── GroupDtos.cs
+│       │   ├── TeamDtos.cs
+│       │   └── TournamentDtos.cs
+│       ├── Extensions/               # Endpoint filters and pipeline extensions
+│       │   └── ValidationFilter.cs
+│       ├── Properties/
+│       │   └── launchSettings.json
+│       ├── Routes/                   # Minimal API route definitions and handlers
+│       │   └── TournamentRoutes.cs
+│       ├── Validators/               # FluentValidation request validators
+│       │   ├── AssignGroupsRequestValidator.cs
+│       │   ├── AssignTeamsRequestValidator.cs
+│       │   └── CreateTournamentRequestValidator.cs
+│       ├── appsettings.json
+│       ├── Program.cs
+│       ├── TournamentServices.Api.csproj
+│       └── TournamentServices.Api.http
+└── tests/
+    └── TournamentServices.Api.Tests/
+        ├── Routes/                   # Integration tests using WebApplicationFactory
+        │   └── TournamentRoutesTests.cs
+        ├── Validators/               # Unit tests for FluentValidation rules
+        │   └── CreateTournamentValidatorTests.cs
+        └── TournamentServices.Api.Tests.csproj
 
 ## Getting Started
 
@@ -24,7 +56,8 @@ A lightweight Tournament Management REST API built with C# and .NET Minimal APIs
 
 ```bash
 # From the project root
-dotnet run --project Tournaments_V1
+dotnet build
+dotnet run --project src/TournamentServices.Api
 ```
 
 The API will start listening at: `http://localhost:8080`
@@ -36,20 +69,19 @@ dotnet test
 
 ### API Specification
 All request and response bodies use `application/json.` All identifier parameters (`id`, `groupId`, etc.) must match the pattern `^[A-Za-z0-9\-]+$`.
+| Method | Route | Description | Status Codes |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/tournaments` | Creates a new tournament | `201 Created`, `400 Bad Request` |
+| `GET` | `/api/v1/tournaments/{id}` | Retrieves tournament details by ID | `200 OK`, `400 Bad Request`, `404 Not Found` |
+| `POST` | `/api/v1/tournaments/{id}/groups` | Assigns groups to an existing tournament | `200 OK`, `400 Bad Request`, `404 Not Found` |
+| `POST` | `/api/v1/tournaments/{id}/groups/{groupId}/teams` | Assigns teams to a tournament group | `200 OK`, `400 Bad Request`, `404 Not Found` |
 
-### Structure 
-```plaintext
-Tournaments_V1/
-├── Common/Filters/       # Endpoint filters (e.g., ValidationFilter)
-├── Contracts/            # Request and Response DTO records
-│   ├── Requests/
-│   └── Responses/
-├── Endpoints/            # Route groups and handler mappings
-├── Validators/           # FluentValidation rules
-├── appsettings.json      # Server configuration and ports
-└── Program.cs            # DI service registration and middleware pipeline
+---
 
-Tournaments_V1.Tests/
-├── Endpoints/            # Integration tests via WebApplicationFactory
-└── Validators/           # Unit tests for FluentValidation rules
-```
+## Next Steps (Roadmap)
+
+- [ ] Scaffold `TournamentServices.Domain` class library with core domain entities (`Tournament`, `Team`, `Group`, `Match`, `Score`).
+- [ ] Scaffold `TournamentServices.Delegates` to decouple routing from business orchestration (`ITournamentDelegate`, `TournamentDelegate`, etc.).
+- [ ] Implement `TournamentServices.Repositories` for data access and persistence (`ITournamentRepository`, etc.).
+- [ ] Add Match and Scoring endpoints and contracts (`MatchRoutes.cs`, `MatchDtos.cs`).
+- [ ] Register Delegate and Repository implementations in `Program.cs` to replace route stubs with actual logic.
