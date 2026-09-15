@@ -1,9 +1,5 @@
 # Tournaments_V1
 
-A lightweight Tournament Management REST API built with C# and .NET Minimal APIs, designed using a top-down architecture with contract validation and automated testing.
-
----
-
 ## Tech Stack
 
 * **Runtime:** .NET 9 / 10+

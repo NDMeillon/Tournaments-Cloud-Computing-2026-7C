@@ -1,0 +1,14 @@
+using FluentValidation;
+using TournamentServices.Api.Dtos;
+
+namespace TournamentServices.Api.Validators;
+
+public class CreateTeamDtoValidator : AbstractValidator<CreateTeamDto>
+{
+    public CreateTeamDtoValidator()
+    {
+        RuleFor(x => x.Name)
+            .NotEmpty().WithMessage("Team name is required.")
+            .MaximumLength(100).WithMessage("Team name cannot exceed 100 characters.");
+    }
+}
