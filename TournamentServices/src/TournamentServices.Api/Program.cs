@@ -1,11 +1,13 @@
 
 using FluentValidation;
+using TournamentServices.Api.Delegates;
 using TournamentServices.Api.Routes;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddDelegateLayer();
 
 var app = builder.Build();
 
