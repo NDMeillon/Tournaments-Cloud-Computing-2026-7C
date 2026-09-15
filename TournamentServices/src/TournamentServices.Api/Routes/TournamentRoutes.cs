@@ -11,98 +11,105 @@ public static class TournamentRoutes
 
     public static RouteGroupBuilder MapTournamentRoutes(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/v1/tournaments")
+        var group = app.MapGroup("/tournaments")
                        .WithTags("Tournaments");
 
-        // Use "" so it matches "/api/v1/tournaments" without enforcing a trailing slash
+        group.MapGet("", GetAllTournaments);
+
+        group.MapGet("/{tournamentId}", GetTournamentById);
+
         group.MapPost("", CreateTournament)
-             .AddEndpointFilter<ValidationFilter<CreateTournamentRequest>>();
+             .AddEndpointFilter<ValidationFilter<CreateTournamentDto>>();
 
-        group.MapGet("/{id}", GetTournamentById);
+        group.MapPut("/{tournamentId}", UpdateTournament)
+             .AddEndpointFilter<ValidationFilter<UpdateTournamentDto>>();
 
-        group.MapPost("/{id}/groups", AssignGroups)
-             .AddEndpointFilter<ValidationFilter<AssignGroupsRequest>>();
+        group.MapPatch("/{tournamentId}", PatchTournament)
+             .AddEndpointFilter<ValidationFilter<PatchTournamentDto>>();
 
-        group.MapPost("/{id}/groups/{groupId}/teams", AssignTeams)
-             .AddEndpointFilter<ValidationFilter<AssignTeamsRequest>>();
+        group.MapDelete("/{tournamentId}", DeleteTournament);
 
         return group;
     }
 
-    private static Results<Created<TournamentResponse>, BadRequest<string>> CreateTournament(
-        CreateTournamentRequest request)
+    private static Ok<List<TournamentDto>> GetAllTournaments()
     {
-        var stub = new TournamentResponse(
-            request.Id,
-            request.Name,
-            request.StartDate,
-            []
-        );
+        var stubs = new List<TournamentDto>
+        {
+            CreateStub("torneo-1", "Copa Premier", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN)),
+            CreateStub("torneo-2", "Liga Clausura", new TournamentFormatDto(6, 4, TournamentType.NFL))
+        };
 
-        return TypedResults.Created($"/api/v1/tournaments/{request.Id}", stub);
+        return TypedResults.Ok(stubs);
     }
 
-    private static Results<Ok<TournamentResponse>, BadRequest<string>, NotFound> GetTournamentById(
-        string id)
+    private static Results<Ok<TournamentDto>, BadRequest<string>, NotFound> GetTournamentById(string tournamentId)
     {
-        if (!Regex.IsMatch(id, IdPattern))
+        if (!Regex.IsMatch(tournamentId, IdPattern))
         {
             return TypedResults.BadRequest("Invalid Tournament ID format.");
         }
 
-        var stub = new TournamentResponse(
-            id,
-            "Copa Premier",
-            DateTime.UtcNow.AddDays(7),
-            []
-        );
-
+        var stub = CreateStub(tournamentId, "Copa Premier", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN));
         return TypedResults.Ok(stub);
     }
 
-    private static Results<Ok<TournamentResponse>, BadRequest<string>, NotFound> AssignGroups(
-        string id,
-        AssignGroupsRequest request)
+    private static Created<TournamentDto> CreateTournament(CreateTournamentDto request)
     {
-        if (!Regex.IsMatch(id, IdPattern))
+        var generatedId = $"trn-{Guid.NewGuid().ToString("N")[..8]}";
+        var stub = CreateStub(generatedId, request.Name, request.Format);
+
+        return TypedResults.Created($"/tournaments/{stub.Id}", stub);
+    }
+
+    private static Results<Ok<TournamentDto>, BadRequest<string>, NotFound> UpdateTournament(
+        string tournamentId,
+        UpdateTournamentDto request)
+    {
+        if (!Regex.IsMatch(tournamentId, IdPattern))
         {
             return TypedResults.BadRequest("Invalid Tournament ID format.");
         }
 
-        var groupResponses = request.Groups
-            .Select(g => new GroupResponse(g.Id, g.Name, []))
-            .ToList();
-
-        var stub = new TournamentResponse(
-            id,
-            "Copa Premier",
-            DateTime.UtcNow.AddDays(7),
-            groupResponses
-        );
-
+        var stub = CreateStub(tournamentId, request.Name, request.Format);
         return TypedResults.Ok(stub);
     }
 
-    private static Results<Ok<GroupResponse>, BadRequest<string>, NotFound> AssignTeams(
-        string id,
-        string groupId,
-        AssignTeamsRequest request)
+    private static Results<Ok<TournamentDto>, BadRequest<string>, NotFound> PatchTournament(
+        string tournamentId,
+        PatchTournamentDto request)
     {
-        if (!Regex.IsMatch(id, IdPattern) || !Regex.IsMatch(groupId, IdPattern))
+        if (!Regex.IsMatch(tournamentId, IdPattern))
         {
-            return TypedResults.BadRequest("Invalid ID format in route parameters.");
+            return TypedResults.BadRequest("Invalid Tournament ID format.");
         }
 
-        var teamResponses = request.Teams
-            .Select(t => new TeamResponse(t.Id, t.Name))
-            .ToList();
-
-        var stub = new GroupResponse(
-            groupId,
-            "Grupo A",
-            teamResponses
+        var resolvedFormat = new TournamentFormatDto(
+            request.Format?.MaxTeamsPerGroup ?? 4,
+            request.Format?.NumberOfGroups ?? 2,
+            request.Format?.Type ?? TournamentType.ROUND_ROBIN
         );
 
+        var stub = CreateStub(tournamentId, request.Name ?? "Torneo Parcial", resolvedFormat);
         return TypedResults.Ok(stub);
     }
+
+    private static Results<NoContent, BadRequest<string>, NotFound> DeleteTournament(string tournamentId)
+    {
+        if (!Regex.IsMatch(tournamentId, IdPattern))
+        {
+            return TypedResults.BadRequest("Invalid Tournament ID format.");
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static TournamentDto CreateStub(string id, string name, TournamentFormatDto format) =>
+        new(
+            Id: id,
+            Name: name,
+            Format: format,
+            Groups: [],
+            Matches: []
+        );
 }

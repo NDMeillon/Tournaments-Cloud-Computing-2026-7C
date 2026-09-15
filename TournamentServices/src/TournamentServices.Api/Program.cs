@@ -10,6 +10,9 @@ builder.Services.AddEndpointsApiExplorer();
 var app = builder.Build();
 
 app.MapTournamentRoutes();
+app.MapTeamRoutes();
+app.MapGroupRoutes();
+app.MapMatchRoutes();
 
 app.Run();
 
