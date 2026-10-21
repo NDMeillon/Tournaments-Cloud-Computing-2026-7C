@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT/TournamentServices"
+echo "Corriendo tests antes del commit..."
+dotnet test TournamentServices.sln --nologo

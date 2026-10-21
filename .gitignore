@@ -55,3 +55,8 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# SQLite local de pruebas
+*.db
+*.db-shm
+*.db-wal
