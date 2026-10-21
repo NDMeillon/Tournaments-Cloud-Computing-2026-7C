@@ -1,22 +1,24 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
 using TournamentServices.Api.Dtos;
-using TournamentServices.Api.Routes;
 using Xunit;
 
 namespace TournamentServices.Api.Tests.Routes;
 
-public class TeamRoutesTests : IClassFixture<WebApplicationFactory<Program>>
+public class TeamRoutesTests : IClassFixture<TournamentApiFactory>, IAsyncLifetime
 {
+    private readonly TournamentApiFactory _factory;
     private readonly HttpClient _client;
 
-    public TeamRoutesTests(WebApplicationFactory<Program> factory)
+    public TeamRoutesTests(TournamentApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
-        TeamRoutes.ResetDb();
     }
+
+    public Task InitializeAsync() => _factory.ResetAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     // --- GET /teams ---
 
@@ -169,5 +171,24 @@ public class TeamRoutesTests : IClassFixture<WebApplicationFactory<Program>>
         var response = await _client.DeleteAsync("/teams/non-existent-team");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Health_ReturnsServicesRunning()
+    {
+        var response = await _client.GetAsync("/health");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Should().Be("Services running");
+    }
+
+    [Fact]
+    public async Task Home_ReturnsHtmlPage()
+    {
+        var response = await _client.GetAsync("/");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Tournament Services");
     }
 }

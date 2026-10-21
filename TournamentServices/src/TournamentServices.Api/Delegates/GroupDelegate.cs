@@ -101,7 +101,7 @@ public class GroupDelegate(
         {
             var team = await teams.GetByIdAsync(teamId, ct);
             if (team is null)
-                return OperationResult<GroupDto>.NotFound($"Team '{teamId}' not found.");
+                return OperationResult<GroupDto>.Conflict($"Team '{teamId}' is not part of this tournament.");
             resolved.Add(team);
         }
 

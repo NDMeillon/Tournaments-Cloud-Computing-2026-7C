@@ -2,23 +2,24 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
 using TournamentServices.Api.Dtos;
-using TournamentServices.Api.Routes;
 using Xunit;
 
 namespace TournamentServices.Api.Tests.Routes;
 
-public class TournamentRoutesTests : IClassFixture<WebApplicationFactory<Program>>
+public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsyncLifetime
 {
+    private readonly TournamentApiFactory _factory;
     private readonly HttpClient _client;
 
-    public TournamentRoutesTests(WebApplicationFactory<Program> factory)
+    public TournamentRoutesTests(TournamentApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
-        TournamentRoutes.ResetDb();
-        TeamRoutes.ResetDb();
     }
+
+    public Task InitializeAsync() => _factory.ResetAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     // --- GET /tournaments ---
 
@@ -51,32 +52,38 @@ public class TournamentRoutesTests : IClassFixture<WebApplicationFactory<Program
 
     // --- GET /tournaments/{id} ---
 
-    /*[Fact(Skip = "Requires DB")]
+    [Fact]
     public async Task GetTournamentById_WhenIdExists_Returns200WithGroupsAndMatchesPopulated()
     {
-        // Simulamos un torneo con grupos y partidos ya asociados en la DB
-        var seededTournament = new TournamentDto(
-            Id: "trn-seeded-1",
-            Name: "Champions Cup",
-            Format: new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN),
-            Groups: [
-                new GroupDto("grp-1", "Grupo A", "trn-seeded-1", [new TeamDto("team-1", "Tigres")])
-            ],
-            Matches: [
-                new MatchDto("mtc-1", "trn-seeded-1", "grp-1", "team-1", "team-2", null, null, new ScoreDto(0, 0), null, false)
-            ]
-        );
-        TournamentRoutes.TournamentsDb.Add(seededTournament);
+        var created = await _client.PostAsJsonAsync("/tournaments", new CreateTournamentDto(
+            "Champions Cup", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN)));
+        var seeded = await created.Content.ReadFromJsonAsync<TournamentDto>();
 
-        var response = await _client.GetAsync("/tournaments/trn-seeded-1");
+        var groupResponse = await _client.PostAsJsonAsync(
+            $"/tournaments/{seeded!.Id}/groups", new CreateGroupDto("Grupo A"));
+        var group = await groupResponse.Content.ReadFromJsonAsync<GroupDto>();
+
+        var home = await _client.PostAsJsonAsync("/teams", new CreateTeamDto("Tigres"));
+        var away = await _client.PostAsJsonAsync("/teams", new CreateTeamDto("Rayados"));
+        var homeTeam = await home.Content.ReadFromJsonAsync<TeamDto>();
+        var awayTeam = await away.Content.ReadFromJsonAsync<TeamDto>();
+
+        (await _client.PatchAsJsonAsync(
+            $"/tournaments/{seeded.Id}/groups/{group!.Id}/teams",
+            new AssignTeamsDto([homeTeam!.Id, awayTeam!.Id]))).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await _client.PostAsJsonAsync(
+            $"/tournaments/{seeded.Id}/matches",
+            new CreateMatchDto(group.Id, homeTeam.Id, awayTeam.Id))).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var response = await _client.GetAsync($"/tournaments/{seeded.Id}");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var tournament = await response.Content.ReadFromJsonAsync<TournamentDto>();
         tournament.Should().NotBeNull();
-        tournament!.Id.Should().Be("trn-seeded-1");
-        tournament.Groups.Should().HaveCount(1);
-        tournament.Matches.Should().HaveCount(1);
-    }*/
+        tournament!.Groups.Should().ContainSingle();
+        tournament.Matches.Should().ContainSingle();
+    }
 
     [Fact]
     public async Task GetTournamentById_WhenIdNotFound_Returns404NotFound()

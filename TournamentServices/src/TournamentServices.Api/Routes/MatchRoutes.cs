@@ -1,5 +1,4 @@
-using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.Http.HttpResults;
+using TournamentServices.Api.Delegates;
 using TournamentServices.Api.Dtos;
 using TournamentServices.Api.Extensions;
 
@@ -7,123 +6,78 @@ namespace TournamentServices.Api.Routes;
 
 public static class MatchRoutes
 {
-    private const string IdPattern = @"^[A-Za-z0-9\-]+$";
-
     public static RouteGroupBuilder MapMatchRoutes(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/tournaments/{tournamentId}/matches")
                        .WithTags("Matches");
 
         group.MapGet("", GetMatches);
-
         group.MapGet("/{matchId}", GetMatchById);
-
         group.MapPost("", CreateMatch)
              .AddEndpointFilter<ValidationFilter<CreateMatchDto>>();
-
         group.MapPatch("/{matchId}/score", UpdateScore)
              .AddEndpointFilter<ValidationFilter<UpdateScoreDto>>();
-
         group.MapDelete("/{matchId}", DeleteMatch);
 
         return group;
     }
 
-    private static Results<Ok<List<MatchDto>>, BadRequest<string>> GetMatches(string tournamentId)
+    private static async Task<IResult> GetMatches(string tournamentId, IMatchDelegate matches, CancellationToken ct)
     {
-        if (!Regex.IsMatch(tournamentId, IdPattern))
-        {
+        if (!RouteSupport.IsValidId(tournamentId))
             return TypedResults.BadRequest("Invalid Tournament ID format.");
-        }
 
-        var stubs = new List<MatchDto>
-        {
-            CreateMatchStub("match-1", tournamentId, "team-1", "team-2")
-        };
-
-        return TypedResults.Ok(stubs);
+        return RouteSupport.From(await matches.GetByTournamentAsync(tournamentId, ct), TypedResults.Ok);
     }
 
-    private static Results<Ok<MatchDto>, BadRequest<string>, NotFound> GetMatchById(string tournamentId, string matchId)
-    {
-        if (!Regex.IsMatch(tournamentId, IdPattern) || !Regex.IsMatch(matchId, IdPattern))
-        {
-            return TypedResults.BadRequest("Invalid ID format.");
-        }
-
-        var stub = CreateMatchStub(matchId, tournamentId, "team-1", "team-2");
-        return TypedResults.Ok(stub);
-    }
-
-    private static Results<Created<MatchDto>, BadRequest<string>> CreateMatch(string tournamentId, CreateMatchDto request)
-    {
-        if (!Regex.IsMatch(tournamentId, IdPattern))
-        {
-            return TypedResults.BadRequest("Invalid Tournament ID format.");
-        }
-
-        var generatedId = $"mtc-{Guid.NewGuid().ToString("N")[..8]}";
-        var stub = CreateMatchStub(generatedId, tournamentId, request.HomeTeamId, request.VisitorTeamId, request.GroupId);
-
-        return TypedResults.Created($"/tournaments/{tournamentId}/matches/{stub.Id}", stub);
-    }
-
-    private static Results<Ok<MatchDto>, BadRequest<string>, NotFound> UpdateScore(
+    private static async Task<IResult> GetMatchById(
         string tournamentId,
         string matchId,
-        UpdateScoreDto request)
+        IMatchDelegate matches,
+        CancellationToken ct)
     {
-        if (!Regex.IsMatch(tournamentId, IdPattern) || !Regex.IsMatch(matchId, IdPattern))
-        {
+        if (!RouteSupport.IsValidId(tournamentId) || !RouteSupport.IsValidId(matchId))
             return TypedResults.BadRequest("Invalid ID format.");
-        }
 
-        var winner = request.HomeTeamScore > request.VisitorTeamScore
-            ? MatchWinner.HOME
-            : MatchWinner.VISITOR;
-
-        var stub = new MatchDto(
-            Id: matchId,
-            TournamentId: tournamentId,
-            GroupId: "group-a",
-            HomeTeamId: "team-1",
-            VisitorTeamId: "team-2",
-            HomeTeam: new TeamDto("team-1", "Tigres"),
-            VisitorTeam: new TeamDto("team-2", "Rayados"),
-            Score: new ScoreDto(request.HomeTeamScore, request.VisitorTeamScore),
-            Winner: winner,
-            IsCompleted: true
-        );
-
-        return TypedResults.Ok(stub);
+        return RouteSupport.From(await matches.GetByIdAsync(tournamentId, matchId, ct), TypedResults.Ok);
     }
 
-    private static Results<NoContent, BadRequest<string>, NotFound> DeleteMatch(string tournamentId, string matchId)
-    {
-        if (!Regex.IsMatch(tournamentId, IdPattern) || !Regex.IsMatch(matchId, IdPattern))
-        {
-            return TypedResults.BadRequest("Invalid ID format.");
-        }
-
-        return TypedResults.NoContent();
-    }
-
-    private static MatchDto CreateMatchStub(
-        string matchId,
+    private static async Task<IResult> CreateMatch(
         string tournamentId,
-        string homeTeamId,
-        string visitorTeamId,
-        string? groupId = null) =>
-        new(
-            Id: matchId,
-            TournamentId: tournamentId,
-            GroupId: groupId,
-            HomeTeamId: homeTeamId,
-            VisitorTeamId: visitorTeamId,
-            HomeTeam: new TeamDto(homeTeamId, "Equipo Local"),
-            VisitorTeam: new TeamDto(visitorTeamId, "Equipo Visitante"),
-            Score: new ScoreDto(0, 0),
-            Winner: null,
-            IsCompleted: false
-        );
+        CreateMatchDto request,
+        IMatchDelegate matches,
+        CancellationToken ct)
+    {
+        if (!RouteSupport.IsValidId(tournamentId))
+            return TypedResults.BadRequest("Invalid Tournament ID format.");
+
+        return RouteSupport.From(
+            await matches.CreateAsync(tournamentId, request, ct),
+            match => TypedResults.Created($"/tournaments/{tournamentId}/matches/{match.Id}", match));
+    }
+
+    private static async Task<IResult> UpdateScore(
+        string tournamentId,
+        string matchId,
+        UpdateScoreDto request,
+        IMatchDelegate matches,
+        CancellationToken ct)
+    {
+        if (!RouteSupport.IsValidId(tournamentId) || !RouteSupport.IsValidId(matchId))
+            return TypedResults.BadRequest("Invalid ID format.");
+
+        return RouteSupport.From(await matches.UpdateScoreAsync(tournamentId, matchId, request, ct), TypedResults.Ok);
+    }
+
+    private static async Task<IResult> DeleteMatch(
+        string tournamentId,
+        string matchId,
+        IMatchDelegate matches,
+        CancellationToken ct)
+    {
+        if (!RouteSupport.IsValidId(tournamentId) || !RouteSupport.IsValidId(matchId))
+            return TypedResults.BadRequest("Invalid ID format.");
+
+        return RouteSupport.From(await matches.DeleteAsync(tournamentId, matchId, ct), _ => TypedResults.NoContent());
+    }
 }

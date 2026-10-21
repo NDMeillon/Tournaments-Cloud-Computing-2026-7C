@@ -1,5 +1,5 @@
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http.HttpResults;
+using TournamentServices.Api.Delegates;
 using TournamentServices.Api.Dtos;
 using TournamentServices.Api.Extensions;
 
@@ -7,11 +7,6 @@ namespace TournamentServices.Api.Routes;
 
 public static class TournamentRoutes
 {
-    private const string IdPattern = @"^[A-Za-z0-9\-]+$";
-    internal static readonly List<TournamentDto> TournamentsDb = [];
-
-    public static void ResetDb() => TournamentsDb.Clear();
-
     public static RouteGroupBuilder MapTournamentRoutes(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/tournaments")
@@ -23,122 +18,59 @@ public static class TournamentRoutes
              .AddEndpointFilter<ValidationFilter<CreateTournamentDto>>();
         group.MapPut("/{tournamentId}", UpdateTournament)
              .AddEndpointFilter<ValidationFilter<UpdateTournamentDto>>();
-        group.MapPatch("/{tournamentId}", PatchTournament)
-             .AddEndpointFilter<ValidationFilter<PatchTournamentDto>>();
+        group.MapPatch("/{tournamentId}", PatchTournament);
         group.MapDelete("/{tournamentId}", DeleteTournament);
 
         return group;
     }
 
-    private static Ok<List<TournamentDto>> GetAllTournaments()
-    {
-        return TypedResults.Ok(TournamentsDb.ToList());
-    }
+    private static async Task<Ok<List<TournamentDto>>> GetAllTournaments(ITournamentDelegate tournaments, CancellationToken ct) =>
+        TypedResults.Ok(await tournaments.GetAllAsync(ct));
 
-    private static Results<Ok<TournamentDto>, BadRequest<string>, NotFound> GetTournamentById(string tournamentId)
+    private static async Task<IResult> GetTournamentById(string tournamentId, ITournamentDelegate tournaments, CancellationToken ct)
     {
-        if (!Regex.IsMatch(tournamentId, IdPattern))
-        {
+        if (!RouteSupport.IsValidId(tournamentId))
             return TypedResults.BadRequest("Invalid Tournament ID format.");
-        }
 
-        var tournament = TournamentsDb.FirstOrDefault(t => t.Id == tournamentId);
-        return tournament is null ? TypedResults.NotFound() : TypedResults.Ok(tournament);
+        return RouteSupport.From(await tournaments.GetByIdAsync(tournamentId, ct), TypedResults.Ok);
     }
 
-    private static Created<TournamentDto> CreateTournament(CreateTournamentDto request)
+    private static async Task<IResult> CreateTournament(CreateTournamentDto request, ITournamentDelegate tournaments, CancellationToken ct)
     {
-        var generatedId = $"trn-{Guid.NewGuid().ToString("N")[..8]}";
-        var tournament = new TournamentDto(
-            Id: generatedId,
-            Name: request.Name,
-            Format: request.Format,
-            Groups: [],
-            Matches: []
-        );
-
-        TournamentsDb.Add(tournament);
-        return TypedResults.Created($"/tournaments/{tournament.Id}", tournament);
+        return RouteSupport.From(
+            await tournaments.CreateAsync(request, ct),
+            tournament => TypedResults.Created($"/tournaments/{tournament.Id}", tournament));
     }
 
-    private static Results<Ok<TournamentDto>, BadRequest<string>, NotFound> UpdateTournament(
+    private static async Task<IResult> UpdateTournament(
         string tournamentId,
-        UpdateTournamentDto request)
+        UpdateTournamentDto request,
+        ITournamentDelegate tournaments,
+        CancellationToken ct)
     {
-        if (!Regex.IsMatch(tournamentId, IdPattern))
-        {
+        if (!RouteSupport.IsValidId(tournamentId))
             return TypedResults.BadRequest("Invalid Tournament ID format.");
-        }
 
-        var index = TournamentsDb.FindIndex(t => t.Id == tournamentId);
-        if (index == -1)
-        {
-            return TypedResults.NotFound();
-        }
-
-        var existing = TournamentsDb[index];
-        var updated = existing with
-        {
-            Name = request.Name,
-            Format = request.Format
-        };
-
-        TournamentsDb[index] = updated;
-        return TypedResults.Ok(updated);
+        return RouteSupport.From(await tournaments.UpdateAsync(tournamentId, request, ct), TypedResults.Ok);
     }
 
-    private static Results<Ok<TournamentDto>, BadRequest<string>, NotFound> PatchTournament(
+    private static async Task<IResult> PatchTournament(
         string tournamentId,
-        PatchTournamentDto request)
+        PatchTournamentDto request,
+        ITournamentDelegate tournaments,
+        CancellationToken ct)
     {
-        if (!Regex.IsMatch(tournamentId, IdPattern))
-        {
+        if (!RouteSupport.IsValidId(tournamentId))
             return TypedResults.BadRequest("Invalid Tournament ID format.");
-        }
 
-        var index = TournamentsDb.FindIndex(t => t.Id == tournamentId);
-        if (index == -1)
-        {
-            return TypedResults.NotFound();
-        }
-
-        var existing = TournamentsDb[index];
-        var newName = request.Name ?? existing.Name;
-        
-        var newFormat = existing.Format;
-        if (request.Format is not null)
-        {
-            newFormat = new TournamentFormatDto(
-                request.Format.MaxTeamsPerGroup ?? existing.Format.MaxTeamsPerGroup,
-                request.Format.NumberOfGroups ?? existing.Format.NumberOfGroups,
-                request.Format.Type ?? existing.Format.Type
-            );
-        }
-
-        var patched = existing with
-        {
-            Name = newName,
-            Format = newFormat
-        };
-
-        TournamentsDb[index] = patched;
-        return TypedResults.Ok(patched);
+        return RouteSupport.From(await tournaments.PatchAsync(tournamentId, request, ct), TypedResults.Ok);
     }
 
-    private static Results<NoContent, BadRequest<string>, NotFound> DeleteTournament(string tournamentId)
+    private static async Task<IResult> DeleteTournament(string tournamentId, ITournamentDelegate tournaments, CancellationToken ct)
     {
-        if (!Regex.IsMatch(tournamentId, IdPattern))
-        {
+        if (!RouteSupport.IsValidId(tournamentId))
             return TypedResults.BadRequest("Invalid Tournament ID format.");
-        }
 
-        var tournament = TournamentsDb.FirstOrDefault(t => t.Id == tournamentId);
-        if (tournament is null)
-        {
-            return TypedResults.NotFound();
-        }
-
-        TournamentsDb.Remove(tournament);
-        return TypedResults.NoContent();
+        return RouteSupport.From(await tournaments.DeleteAsync(tournamentId, ct), _ => TypedResults.NoContent());
     }
 }

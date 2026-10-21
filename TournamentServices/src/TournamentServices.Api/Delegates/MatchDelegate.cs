@@ -34,17 +34,18 @@ public class MatchDelegate(
         if (await tournaments.GetByIdAsync(tournamentId, ct) is null)
             return OperationResult<MatchDto>.NotFound($"Tournament '{tournamentId}' not found.");
 
-        if (await teams.GetByIdAsync(dto.HomeTeamId, ct) is null)
-            return OperationResult<MatchDto>.NotFound($"Team '{dto.HomeTeamId}' not found.");
+        if (dto.HomeTeamId == dto.VisitorTeamId)
+            return OperationResult<MatchDto>.Conflict("Home team and visitor team must be different.");
 
-        if (await teams.GetByIdAsync(dto.VisitorTeamId, ct) is null)
-            return OperationResult<MatchDto>.NotFound($"Team '{dto.VisitorTeamId}' not found.");
+        if (await teams.GetByIdAsync(dto.HomeTeamId, ct) is null || await teams.GetByIdAsync(dto.VisitorTeamId, ct) is null)
+            return OperationResult<MatchDto>.Conflict("Both teams must belong to this tournament.");
 
-        // Si el partido es de grupo, ambos equipos deben pertenecer a ese grupo.
+        var tournamentGroups = await groups.GetByTournamentAsync(tournamentId, ct);
+
         if (!string.IsNullOrWhiteSpace(dto.GroupId))
         {
-            var group = await groups.GetByIdAsync(dto.GroupId!, ct);
-            if (group is null || group.TournamentId != tournamentId)
+            var group = tournamentGroups.FirstOrDefault(g => g.Id == dto.GroupId);
+            if (group is null)
                 return OperationResult<MatchDto>.NotFound($"Group '{dto.GroupId}' not found in tournament '{tournamentId}'.");
 
             var memberIds = group.Teams.Select(t => t.Id).ToHashSet();
@@ -52,12 +53,18 @@ public class MatchDelegate(
                 return OperationResult<MatchDto>.Conflict(
                     $"Both teams must belong to group '{dto.GroupId}'.");
         }
+        else
+        {
+            var memberIds = tournamentGroups.SelectMany(g => g.Teams).Select(t => t.Id).ToHashSet();
+            if (!memberIds.Contains(dto.HomeTeamId) || !memberIds.Contains(dto.VisitorTeamId))
+                return OperationResult<MatchDto>.Conflict("Both teams must belong to this tournament.");
+        }
 
         var match = BuildMatch(tournamentId, dto.GroupId, dto.HomeTeamId, dto.VisitorTeamId);
-        await matches.AddAsync(match, ct);
+        var created = await matches.AddAsync(match, ct);
         await uow.CommitAsync(ct);
 
-        return OperationResult<MatchDto>.Ok(match);
+        return OperationResult<MatchDto>.Ok(created);
     }
 
     public async Task<OperationResult<MatchDto>> UpdateScoreAsync(string tournamentId, string matchId, UpdateScoreDto dto, CancellationToken ct = default)
@@ -68,14 +75,23 @@ public class MatchDelegate(
         if (match is null || match.TournamentId != tournamentId)
             return OperationResult<MatchDto>.NotFound($"Match '{matchId}' not found in tournament '{tournamentId}'.");
 
-        if (match.IsCompleted)
-            return OperationResult<MatchDto>.Conflict($"Match '{matchId}' is already finished; its score is locked.");
+        if (dto.HomeTeamScore < 0 || dto.VisitorTeamScore < 0)
+            return OperationResult<MatchDto>.Invalid("Scores cannot be negative.");
 
-        var updated = match with { Score = new ScoreDto(dto.HomeTeamScore, dto.VisitorTeamScore) };
-        await matches.ReplaceAsync(updated, ct);
+        MatchWinner? winner = dto.HomeTeamScore == dto.VisitorTeamScore
+            ? null
+            : dto.HomeTeamScore > dto.VisitorTeamScore ? MatchWinner.HOME : MatchWinner.VISITOR;
+
+        var updated = match with
+        {
+            Score = new ScoreDto(dto.HomeTeamScore, dto.VisitorTeamScore),
+            Winner = winner,
+            IsCompleted = true
+        };
+        var saved = await matches.ReplaceAsync(updated, ct);
         await uow.CommitAsync(ct);
 
-        return OperationResult<MatchDto>.Ok(updated);
+        return OperationResult<MatchDto>.Ok(saved!);
     }
 
     public async Task<OperationResult<bool>> DeleteAsync(string tournamentId, string matchId, CancellationToken ct = default)

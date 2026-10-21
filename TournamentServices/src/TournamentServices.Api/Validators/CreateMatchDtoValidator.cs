@@ -17,10 +17,6 @@ public class CreateMatchDtoValidator : AbstractValidator<CreateMatchDto>
             .NotEmpty().WithMessage("Visitor team ID is required.")
             .Matches(IdPattern).WithMessage("Visitor team ID must match format [A-Za-z0-9-]");
 
-        RuleFor(x => x.VisitorTeamId)
-            .NotEqual(x => x.HomeTeamId)
-            .WithMessage("Home team and visitor team must be different.");
-
         When(x => !string.IsNullOrWhiteSpace(x.GroupId), () =>
         {
             RuleFor(x => x.GroupId!)

@@ -9,6 +9,13 @@
   <ItemGroup>
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TournamentServices.Domain\TournamentServices.Domain.csproj" />
+    <ProjectReference Include="..\TournamentServices.Infrastructure\TournamentServices.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

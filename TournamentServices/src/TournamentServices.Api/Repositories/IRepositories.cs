@@ -40,6 +40,7 @@ public interface IMatchRepository
     Task<MatchDto?> ReplaceAsync(MatchDto match, CancellationToken ct = default);
     Task<bool> RemoveAsync(string matchId, CancellationToken ct = default);
     Task<int> RemoveByTournamentAsync(string tournamentId, CancellationToken ct = default);
+    Task<int> CountByTeamAsync(string teamId, CancellationToken ct = default);
 }
 
 /// <summary>

@@ -6,6 +6,7 @@ namespace TournamentServices.Api.Delegates;
 public class TeamDelegate(
     ITeamRepository teams,
     IGroupRepository groups,
+    IMatchRepository matches,
     IUnitOfWork uow) : ITeamDelegate
 {
     public Task<List<TeamDto>> GetAllAsync(CancellationToken ct = default) =>
@@ -25,7 +26,7 @@ public class TeamDelegate(
 
         var existing = await teams.GetByNameAsync(dto.Name, ct);
         if (existing is not null)
-            return OperationResult<TeamDto>.Conflict($"A team named '{dto.Name}' already exists.");
+            return OperationResult<TeamDto>.Invalid($"A team named '{dto.Name}' already exists.");
 
         var team = new TeamDto($"team-{Guid.NewGuid().ToString("N")[..8]}", dto.Name);
         await teams.AddAsync(team, ct);
@@ -44,7 +45,7 @@ public class TeamDelegate(
 
         var clash = await teams.GetByNameAsync(dto.Name, ct);
         if (clash is not null && clash.Id != teamId)
-            return OperationResult<TeamDto>.Conflict($"A team named '{dto.Name}' already exists.");
+            return OperationResult<TeamDto>.Invalid($"A team named '{dto.Name}' already exists.");
 
         var updated = team with { Name = dto.Name };
         await teams.ReplaceAsync(updated, ct);
@@ -60,6 +61,9 @@ public class TeamDelegate(
         var team = await teams.GetByIdAsync(teamId, ct);
         if (team is null)
             return OperationResult<bool>.NotFound($"Team '{teamId}' not found.");
+
+        if (await matches.CountByTeamAsync(teamId, ct) > 0)
+            return OperationResult<bool>.Conflict($"Team '{teamId}' is still used by a match.");
 
         // Desasigna el equipo de cualquier grupo antes de borrarlo,
         // para no dejar referencias colgantes.

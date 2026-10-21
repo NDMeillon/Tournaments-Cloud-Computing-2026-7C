@@ -1,16 +1,52 @@
-
+using System.Reflection;
+using System.Text.Json.Serialization;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
+using Swashbuckle.AspNetCore;
+using TournamentServices.Api;
 using TournamentServices.Api.Delegates;
 using TournamentServices.Api.Routes;
+using TournamentServices.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
+
+var sqliteConnection = builder.Configuration["SqliteConnection"];
+builder.Services.AddDbContext<TournamentDbContext>(options =>
+{
+    if (!string.IsNullOrWhiteSpace(sqliteConnection))
+        options.UseSqlite(sqliteConnection);
+    else
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+});
+
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.AddDelegateLayer();
 
 var app = builder.Build();
 
+var runningUnderEfTools = Assembly.GetEntryAssembly()?.GetName().Name == "ef";
+if (string.IsNullOrWhiteSpace(sqliteConnection) && !runningUnderEfTools)
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<TournamentDbContext>();
+    db.Database.Migrate();
+}
+
+app.UseSwagger();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Tournament Services");
+});
+
+app.MapGet("/", () => Results.Content(HomePage.Html, "text/html"));
+app.MapGet("/health", () => Results.Text("Services running"));
 app.MapTournamentRoutes();
 app.MapTeamRoutes();
 app.MapGroupRoutes();
@@ -19,45 +55,3 @@ app.MapMatchRoutes();
 app.Run();
 
 public partial class Program { }
-
-//var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-// builder.Services.AddOpenApi();
-
-// var app = builder.Build();
-
-// // Configure the HTTP request pipeline.
-// if (app.Environment.IsDevelopment())
-// {
-//     app.MapOpenApi();
-// }
-
-// app.UseHttpsRedirection();
-
-// var summaries = new[]
-// {
-//     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-// };
-
-// app.MapGet("/weatherforecast", () =>
-// {
-//     var forecast =  Enumerable.Range(1, 5).Select(index =>
-//         new WeatherForecast
-//         (
-//             DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-//             Random.Shared.Next(-20, 55),
-//             summaries[Random.Shared.Next(summaries.Length)]
-//         ))
-//         .ToArray();
-//     return forecast;
-// })
-// .WithName("GetWeatherForecast");
-
-// app.Run();
-
-// record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-// {
-//     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-// }
