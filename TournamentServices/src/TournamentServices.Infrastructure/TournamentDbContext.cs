@@ -27,7 +27,12 @@ public class TournamentDbContext(DbContextOptions<TournamentDbContext> options) 
             entity.HasKey(t => t.Id);
             entity.Property(t => t.Id).HasMaxLength(64);
             entity.Property(t => t.Name).HasMaxLength(100).IsRequired();
-            entity.Property(t => t.Type).HasConversion<string>().HasMaxLength(32);
+            entity.OwnsOne(t => t.Format, format =>
+            {
+            format.Property(f => f.MaxTeamsPerGroup).HasColumnName("MaxTeamsPerGroup");
+            format.Property(f => f.NumberOfGroups).HasColumnName("NumberOfGroups");
+            format.Property(f => f.Type).HasColumnName("Type").HasConversion<string>().HasMaxLength(32);
+            });            
             entity.HasMany(t => t.Groups)
                 .WithOne(g => g.Tournament)
                 .HasForeignKey(g => g.TournamentId)
@@ -47,7 +52,7 @@ public class TournamentDbContext(DbContextOptions<TournamentDbContext> options) 
             entity.Property(g => g.TournamentId).HasMaxLength(64);
             entity.HasIndex(g => new { g.TournamentId, g.Name }).IsUnique();
             entity.HasMany(g => g.Teams)
-                .WithMany()
+                .WithMany(t => t.Groups)
                 .UsingEntity<Dictionary<string, object>>(
                     "group_teams",
                     right => right.HasOne<Team>().WithMany().HasForeignKey("team_id").OnDelete(DeleteBehavior.Cascade),
@@ -69,6 +74,11 @@ public class TournamentDbContext(DbContextOptions<TournamentDbContext> options) 
             entity.Property(m => m.HomeTeamId).HasMaxLength(64);
             entity.Property(m => m.VisitorTeamId).HasMaxLength(64);
             entity.Ignore(m => m.Winner);
+            entity.OwnsOne(m => m.Score, score =>
+            {
+                score.Property(s => s.HomeTeamScore).HasColumnName("HomeScore");
+                score.Property(s => s.VisitorTeamScore).HasColumnName("VisitorScore");
+            });
             entity.HasOne(m => m.Group)
                 .WithMany()
                 .HasForeignKey(m => m.GroupId)
