@@ -45,7 +45,11 @@ app.UseSwaggerUI(options =>
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "Tournament Services");
 });
 
-app.MapGet("/", () => Results.Content(HomePage.Html, "text/html"));
+app.MapGet("/", (IWebHostEnvironment env) =>
+{
+    var path = Path.Combine(env.WebRootPath, "index.html");
+    return Results.Content(File.ReadAllText(path), "text/html; charset=utf-8");
+});
 app.MapGet("/health", () => Results.Text("Services running"));
 app.MapTournamentRoutes();
 app.MapTeamRoutes();

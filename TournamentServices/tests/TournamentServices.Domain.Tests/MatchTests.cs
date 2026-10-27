@@ -51,7 +51,7 @@ public class MatchTests
     [Fact]
     public void Winner_BeforeScore_IsNull()
     {
-        var match = new Match { HomeScore = 4, VisitorScore = 0, IsCompleted = false };
+        var match = new Match { Score = new Score(4, 0), IsCompleted = false };
 
         match.Winner.Should().BeNull();
     }

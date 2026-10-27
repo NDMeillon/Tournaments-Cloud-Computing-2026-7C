@@ -128,9 +128,9 @@ public class EfTournamentRepository(TournamentDbContext db) : ITournamentReposit
         var entity = await db.Tournaments.FirstOrDefaultAsync(t => t.Id == tournament.Id, ct);
         if (entity is null) return null;
         entity.Name = tournament.Name;
-        entity.MaxTeamsPerGroup = tournament.Format.MaxTeamsPerGroup;
-        entity.NumberOfGroups = tournament.Format.NumberOfGroups;
-        entity.Type = EntityMap.ToDomain(tournament.Format.Type);
+        entity.Format.MaxTeamsPerGroup = tournament.Format.MaxTeamsPerGroup;
+        entity.Format.NumberOfGroups = tournament.Format.NumberOfGroups;
+        entity.Format.Type = EntityMap.ToDomain(tournament.Format.Type);
         await db.SaveChangesAsync(ct);
         return tournament;
     }
@@ -259,8 +259,8 @@ public class EfMatchRepository(TournamentDbContext db) : IMatchRepository
             entity.RecordScore(match.Score.HomeTeamScore, match.Score.VisitorTeamScore);
         else
         {
-            entity.HomeScore = match.Score.HomeTeamScore;
-            entity.VisitorScore = match.Score.VisitorTeamScore;
+            entity.Score.HomeTeamScore = match.Score.HomeTeamScore;
+            entity.Score.VisitorTeamScore = match.Score.VisitorTeamScore;
             entity.IsCompleted = false;
         }
 
@@ -298,9 +298,9 @@ internal static class EntityMap
             tournament.Id,
             tournament.Name,
             new TournamentFormatDto(
-                tournament.MaxTeamsPerGroup,
-                tournament.NumberOfGroups,
-                ToDtoType(tournament.Type)),
+                tournament.Format.MaxTeamsPerGroup,
+                tournament.Format.NumberOfGroups,
+                ToDtoType(tournament.Format.Type)),
             [],
             []);
 
@@ -309,9 +309,10 @@ internal static class EntityMap
         {
             Id = tournament.Id,
             Name = tournament.Name,
-            MaxTeamsPerGroup = tournament.Format.MaxTeamsPerGroup,
-            NumberOfGroups = tournament.Format.NumberOfGroups,
-            Type = ToDomain(tournament.Format.Type)
+            Format = new TournamentServices.Domain.TournamentFormat(
+                tournament.Format.MaxTeamsPerGroup,
+                tournament.Format.NumberOfGroups,
+                ToDomain(tournament.Format.Type))
         };
 
     public static GroupDto ToDto(DomainGroup group) =>
@@ -330,7 +331,7 @@ internal static class EntityMap
             match.VisitorTeamId,
             match.HomeTeam is null ? null : new TeamDto(match.HomeTeam.Id, match.HomeTeam.Name),
             match.VisitorTeam is null ? null : new TeamDto(match.VisitorTeam.Id, match.VisitorTeam.Name),
-            new ScoreDto(match.HomeScore, match.VisitorScore),
+            new ScoreDto(match.Score.HomeTeamScore, match.Score.VisitorTeamScore),
             match.Winner is null ? null : Enum.Parse<MatchWinner>(match.Winner.Value.ToString()),
             match.IsCompleted);
 
@@ -342,8 +343,7 @@ internal static class EntityMap
             GroupId = match.GroupId,
             HomeTeamId = match.HomeTeamId,
             VisitorTeamId = match.VisitorTeamId,
-            HomeScore = match.Score.HomeTeamScore,
-            VisitorScore = match.Score.VisitorTeamScore,
+            Score = new TournamentServices.Domain.Score(match.Score.HomeTeamScore, match.Score.VisitorTeamScore),
             IsCompleted = match.IsCompleted
         };
 

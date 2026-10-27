@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tournament Services</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1a1a1a;
+      --muted: #5c5c5c;
+      --line: #d9d9d9;
+      --bg: #f6f6f4;
+      --card: #ffffff;
+      --accent: #0b57d0;
+      --ok: #0d6b3a;
+      --bad: #9b1c1c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.45;
+    }
+    header, main { width: min(1100px, calc(100% - 2rem)); margin: 0 auto; }
+    header { padding: 1.5rem 0 0.5rem; }
+    h1 { font-size: 1.6rem; margin: 0 0 0.25rem; }
+    h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
+    p { margin: 0.3rem 0; }
+    a { color: var(--accent); }
+    code { font-family: Consolas, monospace; font-size: 0.92em; }
+    .lead { color: var(--muted); max-width: 46rem; }
+    .status { font-weight: 600; }
+    .grid3, .layout { display: grid; gap: 0.8rem; }
+    .grid3 { grid-template-columns: repeat(3, 1fr); margin: 1rem 0 1.2rem; }
+    .layout { grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr); align-items: start; padding-bottom: 2rem; }
+    article, aside, .step {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+    }
+    .step { margin-bottom: 0.8rem; }
+    .step h2 span {
+      display: inline-block;
+      min-width: 1.4rem;
+      margin-right: 0.35rem;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-top: 0.55rem; }
+    input, select, button { font: inherit; }
+    input, select {
+      width: 100%;
+      margin-top: 0.2rem;
+      padding: 0.4rem 0.5rem;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.75rem; }
+    button {
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: #fff;
+      border-radius: 6px;
+      padding: 0.4rem 0.7rem;
+      cursor: pointer;
+    }
+    button.secondary { background: #fff; color: var(--accent); }
+    button:disabled { opacity: 0.55; cursor: wait; }
+    aside { position: sticky; top: 0.8rem; }
+    #result {
+      margin: 0.4rem 0 0;
+      padding: 0.7rem;
+      background: #f3f3f1;
+      border-radius: 6px;
+      overflow: auto;
+      max-height: 22rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: Consolas, monospace;
+      font-size: 0.82rem;
+    }
+    .ok { color: var(--ok); }
+    .bad { color: var(--bad); }
+    ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
+    li { margin: 0.15rem 0; }
+    @media (max-width: 800px) {
+      .grid3, .layout, .row { grid-template-columns: 1fr; }
+      aside { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tournament Services</h1>
+    <p class="lead">Guía para armar un torneo desde el navegador. Cada botón llama a la API en este mismo servidor. El detalle técnico sigue en <a href="/swagger">/swagger</a>.</p>
+    <p>Estado: <span id="health" class="status">comprobando…</span></p>
+  </header>
+  <main>
+    <section class="grid3">
+      <article>
+        <h2>Los cuatro recursos</h2>
+        <p><strong>Equipo.</strong> Nombre único en todo el sistema.</p>
+        <p><strong>Torneo.</strong> Formato: equipos por grupo, cantidad de grupos y tipo <code>ROUND_ROBIN</code> o <code>NFL</code>.</p>
+        <p><strong>Grupo.</strong> Vive dentro de un torneo y recibe equipos hasta el máximo del formato.</p>
+        <p><strong>Partido.</strong> Local y visita. Al anotar, el ganador sale del marcador.</p>
+      </article>
+      <article>
+        <h2>Qué hace una petición</h2>
+        <p>La ruta revisa el JSON. El delegado aplica la regla. El repositorio guarda en PostgreSQL.</p>
+        <p>El servidor inventa los ids (<code>trn-</code>, <code>team-</code>, <code>grp-</code>, <code>match-</code>). Esta página los guarda y los rellena en el paso siguiente.</p>
+      </article>
+      <article>
+        <h2>Códigos que vas a ver</h2>
+        <p><strong>201</strong> se creó. <strong>200</strong> se leyó o se actualizó. <strong>204</strong> se asignaron equipos, sin cuerpo.</p>
+        <p><strong>400</strong> el dato o el id están mal. <strong>404</strong> no existe. <strong>422</strong> la regla de negocio lo impide.</p>
+      </article>
+    </section>
+
+    <div class="layout">
+      <section>
+        <form class="step" id="form-tournament">
+          <h2><span>1</span>Crear el torneo</h2>
+          <p>Define el cupo. Con 4 equipos por grupo y 2 grupos, el torneo admite hasta 8 equipos repartidos en dos grupos.</p>
+          <label>Nombre <input name="name" value="Copa Demo" required /></label>
+          <div class="row">
+            <label>Equipos por grupo <input name="maxTeams" type="number" min="1" value="4" required /></label>
+            <label>Cantidad de grupos <input name="groups" type="number" min="1" value="2" required /></label>
+          </div>
+          <label>Tipo
+            <select name="type">
+              <option value="ROUND_ROBIN">ROUND_ROBIN</option>
+              <option value="NFL">NFL</option>
+            </select>
+          </label>
+          <div class="actions"><button type="submit">Crear torneo</button></div>
+        </form>
+
+        <form class="step" id="form-team">
+          <h2><span>2</span>Crear los equipos</h2>
+          <p>El nombre no se puede repetir. Si Mexico o Brasil ya existen, la API responde 400 y puedes elegirlos en la lista de la derecha.</p>
+          <label>Nombre <input name="name" value="Mexico" required /></label>
+          <div class="actions">
+            <button type="submit">Crear equipo</button>
+            <button type="button" class="secondary" id="add-brasil">Crear Brasil</button>
+          </div>
+        </form>
+
+        <form class="step" id="form-group">
+          <h2><span>3</span>Crear el grupo</h2>
+          <p>El grupo pertenece al torneo del paso 1. Un segundo grupo con el mismo nombre responde 422.</p>
+          <label>Id del torneo <input name="tournamentId" required /></label>
+          <label>Nombre del grupo <input name="name" value="Grupo A" required /></label>
+          <div class="actions">
+            <button type="submit">Crear grupo</button>
+            <button type="button" class="secondary" id="dup-group">Probar nombre repetido</button>
+          </div>
+        </form>
+
+        <form class="step" id="form-assign">
+          <h2><span>4</span>Meter los equipos en el grupo</h2>
+          <p>Hasta aquí los equipos existen, pero no juegan en el torneo. Este paso los asigna. La respuesta correcta es 204.</p>
+          <div class="row">
+            <label>Local
+              <select name="home" required></select>
+            </label>
+            <label>Visita
+              <select name="visitor" required></select>
+            </label>
+          </div>
+          <div class="actions"><button type="submit">Asignar estos dos</button></div>
+        </form>
+
+        <form class="step" id="form-match">
+          <h2><span>5</span>Crear el partido</h2>
+          <p>Los dos equipos tienen que estar en el grupo. Si eliges el mismo equipo dos veces, la API responde 422.</p>
+          <div class="actions"><button type="submit">Crear partido</button></div>
+        </form>
+
+        <form class="step" id="form-score">
+          <h2><span>6</span>Cargar el marcador</h2>
+          <p>2 a 1 con Mexico de local deja el ganador en <code>HOME</code>. Un número negativo responde 400. Un empate deja el ganador vacío.</p>
+          <label>Id del partido <input name="matchId" required /></label>
+          <div class="row">
+            <label>Goles local <input name="home" type="number" value="2" required /></label>
+            <label>Goles visita <input name="visitor" type="number" value="1" required /></label>
+          </div>
+          <div class="actions">
+            <button type="submit">Guardar marcador</button>
+            <button type="button" class="secondary" id="show-tournament">Ver el torneo completo</button>
+            <button type="button" class="secondary" id="bad-id">Probar un id inválido</button>
+          </div>
+        </form>
+      </section>
+
+      <aside>
+        <h2>Última respuesta</h2>
+        <p id="call">Todavía no hay llamadas.</p>
+        <pre id="result">Aquí aparece el status y el cuerpo.</pre>
+        <h2>Ids de esta demo</h2>
+        <ul>
+          <li>Torneo: <code id="sum-tournament">—</code></li>
+          <li>Grupo: <code id="sum-group">—</code></li>
+          <li>Partido: <code id="sum-match">—</code></li>
+        </ul>
+        <h2>Equipos en la base</h2>
+        <ul id="team-list"><li>Cargando…</li></ul>
+        <h2>Torneos en la base</h2>
+        <ul id="tournament-list"><li>Cargando…</li></ul>
+      </aside>
+    </div>
+  </main>
+  <script>
+    const state = { tournamentId: "", groupId: "", matchId: "", teams: [] };
+    const $ = (id) => document.getElementById(id);
+
+    const fields = {
+      tournamentId: document.querySelector("#form-group [name=tournamentId]"),
+      home: document.querySelector("#form-assign [name=home]"),
+      visitor: document.querySelector("#form-assign [name=visitor]"),
+      matchId: document.querySelector("#form-score [name=matchId]")
+    };
+
+    function show(method, url, status, text) {
+      $("call").textContent = method + " " + url;
+      const tone = status >= 200 && status < 300 ? "ok" : "bad";
+      let body = text || "(sin cuerpo)";
+      try { if (text) body = JSON.stringify(JSON.parse(text), null, 2); } catch { /* texto plano */ }
+      $("result").textContent = status + "\n" + body;
+      $("result").className = tone;
+    }
+
+    async function call(method, url, body) {
+      const response = await fetch(url, {
+        method,
+        headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body)
+      });
+      const text = await response.text();
+      show(method, url, response.status, text);
+      let json = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* no es JSON */ }
+      return { status: response.status, json };
+    }
+
+    function rememberTeam(team) {
+      if (!team?.id) return;
+      if (!state.teams.some((item) => item.id === team.id)) state.teams.push({ id: team.id, name: team.name });
+      renderTeamSelects();
+    }
+
+    function renderTeamSelects() {
+      for (const select of [fields.home, fields.visitor]) {
+        const current = select.value;
+        select.replaceChildren();
+        if (!state.teams.length) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "Crea o elige un equipo";
+          select.append(option);
+          continue;
+        }
+        for (const team of state.teams) {
+          const option = document.createElement("option");
+          option.value = team.id;
+          option.textContent = team.name + " (" + team.id + ")";
+          select.append(option);
+        }
+        if (current) select.value = current;
+      }
+      if (state.teams.length > 1 && fields.home.value === fields.visitor.value) {
+        fields.visitor.selectedIndex = 1;
+      }
+    }
+
+    function renderSummary() {
+      $("sum-tournament").textContent = state.tournamentId || "—";
+      $("sum-group").textContent = state.groupId || "—";
+      $("sum-match").textContent = state.matchId || "—";
+      fields.tournamentId.value = state.tournamentId;
+      fields.matchId.value = state.matchId;
+    }
+
+    function renderRemote(teams, tournaments) {
+      const teamList = $("team-list");
+      teamList.replaceChildren();
+      if (!teams.length) teamList.append(item("Todavía no hay equipos."));
+      for (const team of teams) {
+        const li = item(team.name + " ");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "secondary";
+        button.textContent = "Usar";
+        button.addEventListener("click", () => { rememberTeam(team); renderSummary(); });
+        li.append(button);
+        teamList.append(li);
+      }
+
+      const tournamentList = $("tournament-list");
+      tournamentList.replaceChildren();
+      if (!tournaments.length) tournamentList.append(item("Todavía no hay torneos."));
+      for (const tournament of tournaments) {
+        const li = item(tournament.name + " ");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "secondary";
+        button.textContent = "Abrir";
+        button.addEventListener("click", () => loadTournament(tournament.id));
+        li.append(button);
+        tournamentList.append(li);
+      }
+    }
+
+    function item(text) {
+      const li = document.createElement("li");
+      li.append(document.createTextNode(text));
+      return li;
+    }
+
+    async function refreshLists() {
+      const [teamsResponse, tournamentsResponse] = await Promise.all([
+        fetch("/teams"),
+        fetch("/tournaments")
+      ]);
+      const teams = await teamsResponse.json();
+      const tournaments = await tournamentsResponse.json();
+      for (const team of teams) rememberTeam(team);
+      renderRemote(teams, tournaments);
+    }
+
+    async function loadTournament(id) {
+      const result = await call("GET", "/tournaments/" + id);
+      if (result.status !== 200 || !result.json) return;
+      state.tournamentId = result.json.id;
+      state.groupId = result.json.groups?.[0]?.id || "";
+      state.matchId = result.json.matches?.[0]?.id || "";
+      for (const group of result.json.groups || []) {
+        for (const team of group.teams || []) rememberTeam(team);
+      }
+      renderSummary();
+    }
+
+    function selectedPair() {
+      return [fields.home.value, fields.visitor.value];
+    }
+
+    function need(ok, message) {
+      if (ok) return true;
+      $("call").textContent = "Falta un paso anterior";
+      $("result").textContent = message;
+      $("result").className = "bad";
+      return false;
+    }
+
+    $("form-tournament").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      const result = await call("POST", "/tournaments", {
+        name: data.get("name"),
+        format: {
+          maxTeamsPerGroup: Number(data.get("maxTeams")),
+          numberOfGroups: Number(data.get("groups")),
+          type: data.get("type")
+        }
+      });
+      if (result.status === 201 && result.json) {
+        state.tournamentId = result.json.id;
+        renderSummary();
+        refreshLists();
+      }
+    });
+
+    $("form-team").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await createTeam(new FormData(event.currentTarget).get("name"));
+    });
+
+    $("add-brasil").addEventListener("click", () => createTeam("Brasil"));
+
+    async function createTeam(name) {
+      const result = await call("POST", "/teams", { name });
+      if (result.status === 201 && result.json) {
+        rememberTeam(result.json);
+        renderSummary();
+        refreshLists();
+      }
+    }
+
+    $("form-group").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      state.tournamentId = data.get("tournamentId");
+      const result = await call("POST", "/tournaments/" + state.tournamentId + "/groups", { name: data.get("name") });
+      if (result.status === 201 && result.json) {
+        state.groupId = result.json.id;
+        renderSummary();
+      }
+    });
+
+    $("dup-group").addEventListener("click", async () => {
+      if (!state.tournamentId) return;
+      const name = document.querySelector("#form-group [name=name]").value;
+      await call("POST", "/tournaments/" + state.tournamentId + "/groups", { name });
+    });
+
+    $("form-assign").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!need(state.tournamentId && state.groupId, "Crea el torneo y el grupo antes de asignar equipos.")) return;
+      const [home, visitor] = selectedPair();
+      await call("PATCH", "/tournaments/" + state.tournamentId + "/groups/" + state.groupId + "/teams", {
+        teamIds: [home, visitor]
+      });
+    });
+
+    $("form-match").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!need(state.tournamentId && state.groupId, "Crea el torneo, el grupo y asigna los equipos antes del partido.")) return;
+      const [home, visitor] = selectedPair();
+      const result = await call("POST", "/tournaments/" + state.tournamentId + "/matches", {
+        groupId: state.groupId,
+        homeTeamId: home,
+        visitorTeamId: visitor
+      });
+      if (result.status === 201 && result.json) {
+        state.matchId = result.json.id;
+        renderSummary();
+      }
+    });
+
+    $("form-score").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      state.matchId = data.get("matchId");
+      await call("PATCH", "/tournaments/" + state.tournamentId + "/matches/" + state.matchId + "/score", {
+        homeTeamScore: Number(data.get("home")),
+        visitorTeamScore: Number(data.get("visitor"))
+      });
+    });
+
+    $("show-tournament").addEventListener("click", () => {
+      if (state.tournamentId) loadTournament(state.tournamentId);
+    });
+
+    $("bad-id").addEventListener("click", () => call("GET", "/teams/hola_mundo"));
+
+    fetch("/health").then((response) => response.text()).then((text) => {
+      $("health").textContent = text;
+    }).catch(() => {
+      $("health").textContent = "la API no respondió";
+    });
+
+    renderTeamSelects();
+    renderSummary();
+    refreshLists();
+  </script>
+</body>
+</html>
