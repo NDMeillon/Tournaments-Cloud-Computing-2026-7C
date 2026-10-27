@@ -17,7 +17,7 @@ El servicio ya administra un torneo de punta a punta: equipos, grupos, partidos 
 | 0–2 | El problema | Una API para armar un torneo. Quien la consume no toca la base. |
 | 2–6 | El modelo | Equipo, torneo con formato, grupo y partido. El marcador calcula el ganador. |
 | 6–11 | Una petición | La ruta valida, el delegado aplica la regla, el repositorio guarda. 400, 404 y 422 separan dato mal formado, recurso inexistente y regla de negocio. |
-| 11–15 | Lo que ya corre | Demo corta: torneo, dos equipos, un grupo, un partido, marcador 2-1 con ganador `HOME`. |
+| 11–15 | Lo que ya corre | Demo en `http://localhost:8080`: torneo, dos equipos, un grupo, un partido, marcador 2-1 con ganador `HOME`. |
 | 15–18 | Cómo se verifica | Pruebas con SQLite. PostgreSQL 16 es la base real. Jenkins migra y prueba. GitHub Actions vuelve a correr `dotnet test`. |
 | 18–20 | Qué sigue | Cerrar pruebas de partidos, unir las reglas al dominio, y los proyectos de prueba de delegados y repositorios. |
 
@@ -46,6 +46,7 @@ El enunciado dibuja cuatro proyectos (`Api`, `Delegates`, `Repositories`, `Domai
 
 | Capa | Dónde está | Qué hace |
 | :--- | :--- | :--- |
+| Página de demo | `TournamentServices.Api/wwwroot/index.html` | `GET /` la sirve. Explica el modelo y arma el recorrido con botones que llaman a la misma API. |
 | Rutas Minimal API | `TournamentServices.Api/Routes` | Reciben HTTP, validan y traducen el resultado a status code. |
 | Delegados | `TournamentServices.Api/Delegates` | Reglas: nombre único, cupo, equipos del mismo grupo, marcador. |
 | Repositorios EF | `TournamentServices.Api/Repositories` | Traducen DTOs a entidades y guardan. |
@@ -57,7 +58,8 @@ Las reglas de grupos y partidos están escritas dos veces. El delegado las aplic
 ## Qué ya se cumplió
 
 - Los 23 endpoints del contrato: salud, equipos, torneos (`PUT` y `PATCH`), grupos (incluye asignar equipos) y partidos (incluye marcador).
-- `GET /health` responde el texto `Services running`. La raíz muestra una página HTML. `/swagger` lista los endpoints.
+- `GET /health` responde el texto `Services running`. `/swagger` sigue listando los endpoints.
+- La raíz es la guía de demo: `wwwroot/index.html`, servida por `GET /` desde `Program.cs`. Explica recursos, petición y códigos, y recorre torneo, equipos, grupo, asignación, partido y marcador. Guarda los ids, muestra el status de cada llamada y trae los botones de 422 y 400.
 - FluentValidation y respuestas de error. Escrituras dentro de una transacción (`IUnitOfWork`).
 - PostgreSQL 16 con EF Core. Tablas `teams`, `tournaments`, `groups`, `matches` y la puente `group_teams`. Al arrancar contra PostgreSQL, la API aplica migraciones pendientes.
 - Borrar un torneo arrastra grupos y partidos. Borrar un equipo lo saca de sus grupos. Si el equipo todavía aparece en un partido, el borrado se rechaza.
@@ -69,19 +71,18 @@ Las reglas de grupos y partidos están escritas dos veces. El delegado las aplic
 
 ## Qué falta o qué sigue
 
-1. **Una prueba de dominio no coincide con el modelo.** `Winner_BeforeScore_IsNull` en `tests/TournamentServices.Domain.Tests/MatchTests.cs` asigna `HomeScore` y `VisitorScore`. El marcador vive en `Match.Score`.
-2. **Pruebas de partidos incompletas.** Falta lista vacía, ver un partido por id, borrarlo con 204 y rechazar un id inválido. En grupos falta afirmar la lista vacía y que borrar un grupo suelta a sus equipos.
-3. **Unir las reglas al dominio** para que el delegado llame a `AddGroup`, `AssignTeams` y `Match.Create` en lugar de repetir la regla.
-4. **Proyectos de prueba que el enunciado nombra y no existen:** `TournamentServices.Delegates.Tests` y `TournamentServices.Repositories.Tests`.
-5. **Umbral de cobertura en el pipeline.** El enunciado pide `dotnet test --collect:"XPlat Code Coverage"` con mínimos (rutas 100 %, delegados 90 %, repositorios 80 %, dominio 100 % de la lógica). Jenkins y GitHub Actions ejecutan las pruebas sin ese umbral.
-6. **`ROUND_ROBIN` y `NFL` se guardan y se pueden cambiar con PATCH.** No cambian el calendario. `CreateWithGroupsAsync` arma grupos A, B, C… y no está publicado en ninguna ruta.
-7. **Marco de trabajo mezclado.** El enunciado pide .NET 10 o superior. Api, Domain e Infrastructure apuntan a `net9.0`. El proyecto de pruebas de la API apunta a `net10.0`.
+1. **Pruebas de partidos incompletas.** Falta lista vacía, ver un partido por id, borrarlo con 204 y rechazar un id inválido. En grupos falta afirmar la lista vacía y que borrar un grupo suelta a sus equipos.
+2. **Unir las reglas al dominio** para que el delegado llame a `AddGroup`, `AssignTeams` y `Match.Create` en lugar de repetir la regla.
+3. **Proyectos de prueba que el enunciado nombra y no existen:** `TournamentServices.Delegates.Tests` y `TournamentServices.Repositories.Tests`.
+4. **Umbral de cobertura en el pipeline.** El enunciado pide `dotnet test --collect:"XPlat Code Coverage"` con mínimos (rutas 100 %, delegados 90 %, repositorios 80 %, dominio 100 % de la lógica). Jenkins y GitHub Actions ejecutan las pruebas sin ese umbral.
+5. **`ROUND_ROBIN` y `NFL` se guardan y se pueden cambiar con PATCH.** No cambian el calendario. `CreateWithGroupsAsync` arma grupos A, B, C… y no está publicado en ninguna ruta.
+6. **Marco de trabajo mezclado.** El enunciado pide .NET 10 o superior. Api, Domain e Infrastructure apuntan a `net9.0`. El proyecto de pruebas de la API apunta a `net10.0`.
 
 El enunciado deja para después, y conviene decirlo en voz alta: autenticación (401/403), eventos al crear o borrar un torneo, y una prueba de peticiones en paralelo.
 
 ## Cierre de la charla
 
-Recorrer la demo de abajo. Enseñar el 422 de un nombre de grupo repetido y el 400 de un id con un carácter fuera del patrón. Cerrar con la lista de pendientes: la API del contrato está, y el trabajo que sigue es unir reglas, pruebas de delegado y repositorio, y el umbral de cobertura.
+Recorrer la demo en `http://localhost:8080`, paso a paso. Enseñar el 422 de **Probar nombre repetido** y el 400 de **Probar un id inválido**. Cerrar con la lista de pendientes: la API del contrato está, y el trabajo que sigue es unir reglas, pruebas de delegado y repositorio, y el umbral de cobertura.
 
 ---
 
@@ -118,8 +119,8 @@ Tiene que imprimir `Services running`.
 
 Abrir en el navegador:
 
-- `http://localhost:8080` — página de inicio
-- `http://localhost:8080/swagger` — desde aquí se hace la demo
+- `http://localhost:8080` — guía y demo. Es la página que se recorre en la charla.
+- `http://localhost:8080/swagger` — el mismo contrato, llamada por llamada.
 
 ## 3. Pruebas (opcional, antes o después de la demo)
 
@@ -133,11 +134,39 @@ Las pruebas de la API no usan el contenedor de PostgreSQL.
 
 ---
 
-# Demo en Swagger
+# Demo en la página
+
+Abrir `http://localhost:8080`. Arriba hay tres bloques: los cuatro recursos, el camino de una petición y los códigos HTTP. Abajo, seis formularios. A la derecha, la última respuesta (status y cuerpo) y los ids que la página va guardando.
+
+`Program.cs` lee `src/TournamentServices.Api/wwwroot/index.html` y lo devuelve en `GET /`. La página llama a la API del mismo origen con `fetch`. No hay otro frontend ni framework.
+
+El servicio genera los ids (`trn-…`, `team-…`, `grp-…`, `match-…`). La página los copia al paso siguiente. También lista los equipos y torneos que ya están en la base: **Usar** mete un equipo en los selectores de local y visita, **Abrir** carga un torneo con su primer grupo y su primer partido.
+
+| Paso | Botón | Qué tiene que verse a la derecha |
+| :--- | :--- | :--- |
+| 1 | **Crear torneo** | **201**. Nombre `Copa Demo`, 4 equipos por grupo, 2 grupos, `ROUND_ROBIN`. El id del torneo se rellena solo. |
+| 2 | **Crear equipo** y luego **Crear Brasil** | **201** por cada uno. Los selectores de local y visita quedan en Mexico y Brasil. |
+| 3 | **Crear grupo** | **201**. Nombre `Grupo A`. |
+| 4 | **Asignar estos dos** | **204**, sin cuerpo. |
+| 5 | **Crear partido** | **201**. Marcador 0-0, sin ganador, `isCompleted` en false. |
+| 6 | **Guardar marcador** | **200**. Goles 2 y 1, `winner` igual a `HOME`, `isCompleted` en true. |
+
+**Ver el torneo completo** hace `GET /tournaments/{id}` y muestra el grupo, los equipos y el partido jugado.
+
+Dos botones cierran la explicación:
+
+- **Probar nombre repetido** vuelve a crear `Grupo A` y responde **422**.
+- **Probar un id inválido** llama a `GET /teams/hola_mundo` y responde **400**. El guion bajo no entra en `^[A-Za-z0-9\-]+$`.
+
+Si Mexico o Brasil ya existen, el alta responde **400** porque el nombre es único. Cambiar el nombre del formulario, o pulsar **Usar** junto al equipo que ya está en la lista.
+
+Docker Desktop tiene que estar abierto. Si `docker` dice que no encuentra el pipe `docker_engine`, el motor no está encendido: abrir Docker Desktop y esperar a que arranque antes de `docker compose up -d db`.
+
+---
+
+# La misma demo en Swagger
 
 Swagger: `http://localhost:8080/swagger`. En cada paso, **Try it out**, pegar el JSON, **Execute**. Anotar los `id` que devuelve el cuerpo: hacen falta en el paso siguiente.
-
-El servicio genera los ids (`team-…`, `trn-…`, `grp-…`, `match-…`). En los ejemplos de abajo, sustituir los placeholders por los ids reales de la respuesta anterior.
 
 ## Paso 1 — Crear el torneo
 
@@ -268,7 +297,7 @@ $played | ConvertTo-Json -Depth 6
 
 La última impresión tiene que mostrar `winner` igual a `HOME`.
 
-Si se corre el script dos veces seguidas, el segundo `Mexico` o `Brasil` falla porque el nombre de equipo es único. Para repetir la demo, usar otros nombres o borrar los equipos desde Swagger (`DELETE /teams/{teamId}`) si no quedaron en un partido.
+Si se corre el script dos veces seguidas, el segundo `Mexico` o `Brasil` falla porque el nombre de equipo es único. Para repetir la demo, usar otros nombres. En la página, **Usar** y **Abrir** retoman lo que ya está en la base. Desde Swagger se puede borrar un equipo con `DELETE /teams/{teamId}` si no quedó en un partido.
 
 ## Apagar
 
