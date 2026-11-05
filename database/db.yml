@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tournaments
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tournament-db
+  namespace: tournaments
+spec:
+  serviceName: tournament-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tournament-db
+  template:
+    metadata:
+      labels:
+        app: tournament-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        env:
+        - name: POSTGRES_DB
+          value: tournament_db
+        - name: POSTGRES_USER
+          value: tournament_svc
+        - name: POSTGRES_PASSWORD
+          value: password
+        ports:
+        - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tournament-db
+  namespace: tournaments
+spec:
+  selector:
+    app: tournament-db
+  ports:
+  - port: 5432
+    targetPort: 5432
