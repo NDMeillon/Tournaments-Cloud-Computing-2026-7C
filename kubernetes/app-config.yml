@@ -4,6 +4,7 @@ metadata:
   name: app-config
   namespace: tournaments
 data:
-  ConnectionStrings__Tournaments: "Host=tournament-db;Database=tournament_db;Username=tournament_svc;Password=password"
+  Urls: "http://+:8080"
+  ConnectionStrings__DefaultConnection: "Host=tournament-db;Database=tournament_db;Username=tournament_svc;Password=password"
   ActiveMq__BrokerUri: "activemq:tcp://artemis:61616"
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://tempo.monitoring.svc.cluster.local:4317"
