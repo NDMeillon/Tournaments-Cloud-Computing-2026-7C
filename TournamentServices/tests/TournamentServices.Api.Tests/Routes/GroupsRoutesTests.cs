@@ -316,7 +316,7 @@ public class GroupRoutesTests : IClassFixture<TournamentApiFactory>, IAsyncLifet
     {
         var response = await _client.PostAsJsonAsync(
             "/tournaments",
-            new CreateTournamentDto("Copa", new TournamentFormatDto(maxTeams, 4, TournamentType.ROUND_ROBIN)));
+            new CreateTournamentDto("Copa", new TournamentFormatDto(maxTeams, 4)));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<TournamentDto>())!;
     }

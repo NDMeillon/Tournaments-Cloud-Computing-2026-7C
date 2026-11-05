@@ -6,7 +6,6 @@ using DomainMatch = TournamentServices.Domain.Match;
 using DomainGroup = TournamentServices.Domain.Group;
 using DomainTeam = TournamentServices.Domain.Team;
 using DomainTournament = TournamentServices.Domain.Tournament;
-using DomainType = TournamentServices.Domain.TournamentType;
 
 namespace TournamentServices.Api.Repositories;
 
@@ -130,7 +129,6 @@ public class EfTournamentRepository(TournamentDbContext db) : ITournamentReposit
         entity.Name = tournament.Name;
         entity.Format.MaxTeamsPerGroup = tournament.Format.MaxTeamsPerGroup;
         entity.Format.NumberOfGroups = tournament.Format.NumberOfGroups;
-        entity.Format.Type = EntityMap.ToDomain(tournament.Format.Type);
         await db.SaveChangesAsync(ct);
         return tournament;
     }
@@ -255,6 +253,7 @@ public class EfMatchRepository(TournamentDbContext db) : IMatchRepository
         entity.GroupId = match.GroupId;
         entity.HomeTeamId = match.HomeTeamId;
         entity.VisitorTeamId = match.VisitorTeamId;
+        entity.Round = match.Round;
         if (match.IsCompleted)
             entity.RecordScore(match.Score.HomeTeamScore, match.Score.VisitorTeamScore);
         else
@@ -299,8 +298,7 @@ internal static class EntityMap
             tournament.Name,
             new TournamentFormatDto(
                 tournament.Format.MaxTeamsPerGroup,
-                tournament.Format.NumberOfGroups,
-                ToDtoType(tournament.Format.Type)),
+                tournament.Format.NumberOfGroups),
             [],
             []);
 
@@ -311,8 +309,7 @@ internal static class EntityMap
             Name = tournament.Name,
             Format = new TournamentServices.Domain.TournamentFormat(
                 tournament.Format.MaxTeamsPerGroup,
-                tournament.Format.NumberOfGroups,
-                ToDomain(tournament.Format.Type))
+                tournament.Format.NumberOfGroups)
         };
 
     public static GroupDto ToDto(DomainGroup group) =>
@@ -333,7 +330,8 @@ internal static class EntityMap
             match.VisitorTeam is null ? null : new TeamDto(match.VisitorTeam.Id, match.VisitorTeam.Name),
             new ScoreDto(match.Score.HomeTeamScore, match.Score.VisitorTeamScore),
             match.Winner is null ? null : Enum.Parse<MatchWinner>(match.Winner.Value.ToString()),
-            match.IsCompleted);
+            match.IsCompleted,
+            match.Round);
 
     public static DomainMatch ToEntity(MatchDto match) =>
         new()
@@ -344,10 +342,7 @@ internal static class EntityMap
             HomeTeamId = match.HomeTeamId,
             VisitorTeamId = match.VisitorTeamId,
             Score = new TournamentServices.Domain.Score(match.Score.HomeTeamScore, match.Score.VisitorTeamScore),
-            IsCompleted = match.IsCompleted
+            IsCompleted = match.IsCompleted,
+            Round = match.Round
         };
-
-    public static DomainType ToDomain(TournamentType type) => Enum.Parse<DomainType>(type.ToString());
-
-    public static TournamentType ToDtoType(DomainType type) => Enum.Parse<TournamentType>(type.ToString());
 }

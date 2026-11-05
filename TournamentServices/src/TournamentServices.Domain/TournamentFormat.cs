@@ -4,11 +4,10 @@ public class TournamentFormat
 {
     public int MaxTeamsPerGroup { get; set; }
     public int NumberOfGroups { get; set; }
-    public TournamentType Type { get; set; }
 
     public TournamentFormat() { }
 
-    public TournamentFormat(int maxTeamsPerGroup, int numberOfGroups, TournamentType type)
+    public TournamentFormat(int maxTeamsPerGroup, int numberOfGroups)
     {
         if (maxTeamsPerGroup <= 0)
             throw new DomainException("MaxTeamsPerGroup must be greater than 0.");
@@ -17,6 +16,5 @@ public class TournamentFormat
 
         MaxTeamsPerGroup = maxTeamsPerGroup;
         NumberOfGroups = numberOfGroups;
-        Type = type;
     }
 }

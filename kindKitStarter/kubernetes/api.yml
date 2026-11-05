@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tournaments-api
+  namespace: tournaments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tournaments-api
+  template:
+    metadata:
+      labels:
+        app: tournaments-api
+    spec:
+      containers:
+        - name: api
+          image: localhost/tournaments-api:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: tournaments-app-config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 8
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 25
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tournaments-api
+  namespace: tournaments
+spec:
+  type: NodePort
+  selector:
+    app: tournaments-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30080

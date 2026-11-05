@@ -26,4 +26,10 @@ public interface IMatchDelegate
     /// Genera el round-robin de todos los grupos del torneo en una sola transaccion.
     /// </summary>
     Task<OperationResult<List<MatchDto>>> GenerateRoundRobinAsync(string tournamentId, CancellationToken ct = default);
+
+    Task<OperationResult<List<MatchDto>>> SimulateGroupMatchesAsync(string tournamentId, CancellationToken ct = default);
+
+    Task<OperationResult<List<GroupStandingDto>>> GetStandingsAsync(string tournamentId, CancellationToken ct = default);
+
+    Task<OperationResult<ChampionDto>> PlayKnockoutAsync(string tournamentId, CancellationToken ct = default);
 }

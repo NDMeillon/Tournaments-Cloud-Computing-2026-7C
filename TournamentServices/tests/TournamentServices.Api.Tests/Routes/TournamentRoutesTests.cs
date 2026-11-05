@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text;
 using FluentAssertions;
 using TournamentServices.Api.Dtos;
 using Xunit;
@@ -38,9 +37,9 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
     public async Task GetAllTournaments_WhenTournamentsExist_Returns200WithPopulatedArray()
     {
         await _client.PostAsJsonAsync("/tournaments", new CreateTournamentDto(
-            "Copa Verano", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN)));
+            "Copa Verano", new TournamentFormatDto(4, 2)));
         await _client.PostAsJsonAsync("/tournaments", new CreateTournamentDto(
-            "Copa Invierno", new TournamentFormatDto(6, 4, TournamentType.NFL)));
+            "Copa Invierno", new TournamentFormatDto(6, 4)));
 
         var response = await _client.GetAsync("/tournaments");
 
@@ -56,7 +55,7 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
     public async Task GetTournamentById_WhenIdExists_Returns200WithGroupsAndMatchesPopulated()
     {
         var created = await _client.PostAsJsonAsync("/tournaments", new CreateTournamentDto(
-            "Champions Cup", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN)));
+            "Champions Cup", new TournamentFormatDto(4, 2)));
         var seeded = await created.Content.ReadFromJsonAsync<TournamentDto>();
 
         var groupResponse = await _client.PostAsJsonAsync(
@@ -95,12 +94,10 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
 
     // --- POST /tournaments ---
 
-    [Theory]
-    [InlineData(TournamentType.ROUND_ROBIN)]
-    [InlineData(TournamentType.NFL)]
-    public async Task CreateTournament_WhenValid_Returns201CreatedAndLocation(TournamentType type)
+    [Fact]
+    public async Task CreateTournament_WhenValid_Returns201CreatedAndLocation()
     {
-        var request = new CreateTournamentDto("Copa Continental", new TournamentFormatDto(4, 2, type));
+        var request = new CreateTournamentDto("Copa Continental", new TournamentFormatDto(4, 2));
 
         var response = await _client.PostAsJsonAsync("/tournaments", request);
 
@@ -109,7 +106,8 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
 
         var tournament = await response.Content.ReadFromJsonAsync<TournamentDto>();
         tournament.Should().NotBeNull();
-        tournament!.Format.Type.Should().Be(type);
+        tournament!.Format.MaxTeamsPerGroup.Should().Be(4);
+        tournament.Format.NumberOfGroups.Should().Be(2);
         response.Headers.Location!.ToString().Should().Be($"/tournaments/{tournament.Id}");
     }
 
@@ -119,29 +117,9 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
     [InlineData("Torneo Invalido", 4, 0)] // Invalid format: numberOfGroups <= 0
     public async Task CreateTournament_WhenInvalidFormatOrMissingName_Returns400BadRequest(string name, int maxTeams, int groups)
     {
-        var request = new CreateTournamentDto(name, new TournamentFormatDto(maxTeams, groups, TournamentType.ROUND_ROBIN));
+        var request = new CreateTournamentDto(name, new TournamentFormatDto(maxTeams, groups));
 
         var response = await _client.PostAsJsonAsync("/tournaments", request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
-
-    [Fact]
-    public async Task CreateTournament_WhenInvalidTypeEnum_Returns400BadRequest()
-    {
-        var invalidJsonPayload = """
-        {
-            "name": "Torneo Raro",
-            "format": {
-                "maxTeamsPerGroup": 4,
-                "numberOfGroups": 2,
-                "type": "INVALID_FORMAT_TYPE"
-            }
-        }
-        """;
-
-        var content = new StringContent(invalidJsonPayload, Encoding.UTF8, "application/json");
-        var response = await _client.PostAsync("/tournaments", content);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -152,10 +130,10 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
     public async Task UpdateTournament_WhenValid_Returns200WithFullUpdate()
     {
         var created = await _client.PostAsJsonAsync("/tournaments", new CreateTournamentDto(
-            "Nombre Viejo", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN)));
+            "Nombre Viejo", new TournamentFormatDto(4, 2)));
         var original = await created.Content.ReadFromJsonAsync<TournamentDto>();
 
-        var updateRequest = new UpdateTournamentDto("Nombre Nuevo", new TournamentFormatDto(8, 4, TournamentType.NFL));
+        var updateRequest = new UpdateTournamentDto("Nombre Nuevo", new TournamentFormatDto(8, 4));
         var response = await _client.PutAsJsonAsync($"/tournaments/{original!.Id}", updateRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -165,13 +143,12 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
         updated.Name.Should().Be("Nombre Nuevo");
         updated.Format.MaxTeamsPerGroup.Should().Be(8);
         updated.Format.NumberOfGroups.Should().Be(4);
-        updated.Format.Type.Should().Be(TournamentType.NFL);
     }
 
     [Fact]
     public async Task UpdateTournament_WhenIdNotFound_Returns404NotFound()
     {
-        var updateRequest = new UpdateTournamentDto("Torneo Fantasma", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN));
+        var updateRequest = new UpdateTournamentDto("Torneo Fantasma", new TournamentFormatDto(4, 2));
 
         var response = await _client.PutAsJsonAsync("/tournaments/non-existent-id", updateRequest);
 
@@ -184,7 +161,7 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
     public async Task PatchTournament_WhenUpdatingNameOnly_Returns200()
     {
         var created = await _client.PostAsJsonAsync("/tournaments", new CreateTournamentDto(
-            "Nombre Base", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN)));
+            "Nombre Base", new TournamentFormatDto(4, 2)));
         var original = await created.Content.ReadFromJsonAsync<TournamentDto>();
 
         var patchRequest = new PatchTournamentDto(Name: "Nombre Parcialmente Editado");
@@ -193,23 +170,24 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var patched = await response.Content.ReadFromJsonAsync<TournamentDto>();
         patched!.Name.Should().Be("Nombre Parcialmente Editado");
-        patched.Format.Type.Should().Be(TournamentType.ROUND_ROBIN);
+        patched.Format.NumberOfGroups.Should().Be(2);
+        patched.Format.MaxTeamsPerGroup.Should().Be(4);
     }
 
     [Fact]
     public async Task PatchTournament_WhenUpdatingFormatOnly_Returns200()
     {
         var created = await _client.PostAsJsonAsync("/tournaments", new CreateTournamentDto(
-            "Nombre Original", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN)));
+            "Nombre Original", new TournamentFormatDto(4, 2)));
         var original = await created.Content.ReadFromJsonAsync<TournamentDto>();
 
-        var patchRequest = new PatchTournamentDto(Format: new PatchTournamentFormatDto(Type: TournamentType.NFL));
+        var patchRequest = new PatchTournamentDto(Format: new PatchTournamentFormatDto(NumberOfGroups: 6));
         var response = await _client.PatchAsJsonAsync($"/tournaments/{original!.Id}", patchRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var patched = await response.Content.ReadFromJsonAsync<TournamentDto>();
         patched!.Name.Should().Be("Nombre Original");
-        patched.Format.Type.Should().Be(TournamentType.NFL);
+        patched.Format.NumberOfGroups.Should().Be(6);
         patched.Format.MaxTeamsPerGroup.Should().Be(4);
     }
 
@@ -217,7 +195,7 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
     public async Task PatchTournament_WhenUpdatingBothNameAndFormat_Returns200()
     {
         var created = await _client.PostAsJsonAsync("/tournaments", new CreateTournamentDto(
-            "Original", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN)));
+            "Original", new TournamentFormatDto(4, 2)));
         var original = await created.Content.ReadFromJsonAsync<TournamentDto>();
 
         var patchRequest = new PatchTournamentDto(
@@ -248,7 +226,7 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
     public async Task DeleteTournament_WhenIdExists_Returns204NoContent()
     {
         var created = await _client.PostAsJsonAsync("/tournaments", new CreateTournamentDto(
-            "A Eliminar", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN)));
+            "A Eliminar", new TournamentFormatDto(4, 2)));
         var tournament = await created.Content.ReadFromJsonAsync<TournamentDto>();
 
         var response = await _client.DeleteAsync($"/tournaments/{tournament!.Id}");
@@ -295,7 +273,7 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
     ];
 
     private static CreateTournamentDto MundialPayload(string name = "Copa Mundial 2026") =>
-        new(name, new TournamentFormatDto(TeamsPerGroup, NumberOfGroups, TournamentType.ROUND_ROBIN));
+        new(name, new TournamentFormatDto(TeamsPerGroup, NumberOfGroups));
 
     // ---------------- Helpers ----------------
 
@@ -355,7 +333,6 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
 
         tournament.Format.NumberOfGroups.Should().Be(NumberOfGroups);
         tournament.Format.MaxTeamsPerGroup.Should().Be(TeamsPerGroup);
-        tournament.Format.Type.Should().Be(TournamentType.ROUND_ROBIN);
 
         teams.Should().HaveCount(TotalTeams);
         groups.Should().HaveCount(NumberOfGroups);
@@ -446,7 +423,7 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
 
         var updateRequest = new UpdateTournamentDto(
             "Copa Mundial 2026 - Fase Final",
-            new TournamentFormatDto(TeamsPerGroup, NumberOfGroups, TournamentType.NFL));
+            new TournamentFormatDto(TeamsPerGroup, NumberOfGroups));
 
         var response = await _client.PutAsJsonAsync($"/tournaments/{tournament.Id}", updateRequest);
 
@@ -458,7 +435,6 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
         updated.Name.Should().Be("Copa Mundial 2026 - Fase Final");
         updated.Format.NumberOfGroups.Should().Be(NumberOfGroups);
         updated.Format.MaxTeamsPerGroup.Should().Be(TeamsPerGroup);
-        updated.Format.Type.Should().Be(TournamentType.NFL);
     }
 
     [Fact]
@@ -468,7 +444,7 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
 
         var updateRequest = new UpdateTournamentDto(
             "Copa Mundial 2026 Ampliada",
-            new TournamentFormatDto(TeamsPerGroup, 16, TournamentType.ROUND_ROBIN));
+            new TournamentFormatDto(TeamsPerGroup, 16));
 
         await _client.PutAsJsonAsync($"/tournaments/{tournament.Id}", updateRequest);
 
@@ -486,7 +462,7 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
         var tournament = await CreateMundialAsync();
 
         var updateRequest = new UpdateTournamentDto(
-            name, new TournamentFormatDto(TeamsPerGroup, numberOfGroups, TournamentType.ROUND_ROBIN));
+            name, new TournamentFormatDto(TeamsPerGroup, numberOfGroups));
 
         var response = await _client.PutAsJsonAsync($"/tournaments/{tournament.Id}", updateRequest);
 
@@ -510,7 +486,6 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
         patched!.Name.Should().Be("Mundial 2026");
         patched.Format.NumberOfGroups.Should().Be(NumberOfGroups);
         patched.Format.MaxTeamsPerGroup.Should().Be(TeamsPerGroup);
-        patched.Format.Type.Should().Be(TournamentType.ROUND_ROBIN);
     }
 
     [Fact]
@@ -528,24 +503,6 @@ public class TournamentRoutesTests : IClassFixture<TournamentApiFactory>, IAsync
         patched!.Name.Should().Be("Copa Mundial 2026");
         patched.Format.MaxTeamsPerGroup.Should().Be(6);
         patched.Format.NumberOfGroups.Should().Be(NumberOfGroups);
-        patched.Format.Type.Should().Be(TournamentType.ROUND_ROBIN);
-    }
-
-    [Fact]
-    public async Task Patch_Mundial_SwitchesTypeToNfl_WithoutTouchingGroupLayout()
-    {
-        var tournament = await CreateMundialAsync();
-
-        var response = await _client.PatchAsJsonAsync(
-            $"/tournaments/{tournament.Id}",
-            new PatchTournamentDto(Format: new PatchTournamentFormatDto(Type: TournamentType.NFL)));
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var patched = await response.Content.ReadFromJsonAsync<TournamentDto>();
-        patched!.Format.Type.Should().Be(TournamentType.NFL);
-        patched.Format.NumberOfGroups.Should().Be(NumberOfGroups);
-        patched.Format.MaxTeamsPerGroup.Should().Be(TeamsPerGroup);
     }
 
     [Fact]

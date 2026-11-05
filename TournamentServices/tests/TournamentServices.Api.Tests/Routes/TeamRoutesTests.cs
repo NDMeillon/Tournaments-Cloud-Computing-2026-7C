@@ -189,6 +189,6 @@ public class TeamRoutesTests : IClassFixture<TournamentApiFactory>, IAsyncLifeti
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
-        (await response.Content.ReadAsStringAsync()).Should().Contain("Tournament Services");
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Mundial");
     }
 }

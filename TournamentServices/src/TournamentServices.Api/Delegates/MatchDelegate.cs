@@ -117,6 +117,11 @@ public class MatchDelegate(
             if (await tournaments.GetByIdAsync(tournamentId, ct) is null)
                 return OperationResult<List<MatchDto>>.NotFound($"Tournament '{tournamentId}' not found.");
 
+            var already = await matches.GetByTournamentAsync(tournamentId, ct);
+            var existingGroupMatches = already.Where(m => m.Round == 0).ToList();
+            if (existingGroupMatches.Count > 0)
+                return OperationResult<List<MatchDto>>.Ok(existingGroupMatches);
+
             var tournamentGroups = await groups.GetByTournamentAsync(tournamentId, ct);
             if (tournamentGroups.Count == 0)
                 return OperationResult<List<MatchDto>>.Conflict("Tournament has no groups to generate matches for.");
@@ -133,11 +138,13 @@ public class MatchDelegate(
                     for (var j = i + 1; j < roster.Count; j++)
                     {
                         var match = BuildMatch(tournamentId, group.Id, roster[i].Id, roster[j].Id);
-                        await matches.AddAsync(match, ct);
-                        generated.Add(match);
+                        generated.Add(await matches.AddAsync(match, ct));
                     }
                 }
             }
+
+            if (generated.Count == 0)
+                return OperationResult<List<MatchDto>>.Conflict("Each group needs at least two teams.");
 
             await uow.CommitAsync(ct);
             return OperationResult<List<MatchDto>>.Ok(generated);
@@ -147,6 +154,184 @@ public class MatchDelegate(
             await uow.RollbackAsync(ct);
             throw;
         }
+    }
+
+    public async Task<OperationResult<List<MatchDto>>> SimulateGroupMatchesAsync(string tournamentId, CancellationToken ct = default)
+    {
+        await using var _ = await uow.BeginAsync(ct);
+
+        if (await tournaments.GetByIdAsync(tournamentId, ct) is null)
+            return OperationResult<List<MatchDto>>.NotFound($"Tournament '{tournamentId}' not found.");
+
+        var all = await matches.GetByTournamentAsync(tournamentId, ct);
+        var groupMatches = all.Where(m => m.Round == 0).ToList();
+        if (groupMatches.Count == 0)
+            return OperationResult<List<MatchDto>>.Conflict("Create the group matches first.");
+
+        foreach (var match in groupMatches.Where(m => !m.IsCompleted))
+        {
+            var homeGoals = Random.Shared.Next(0, 6);
+            var awayGoals = Random.Shared.Next(0, 6);
+            MatchWinner? winner = homeGoals == awayGoals
+                ? null
+                : homeGoals > awayGoals ? MatchWinner.HOME : MatchWinner.VISITOR;
+
+            await matches.ReplaceAsync(match with
+            {
+                Score = new ScoreDto(homeGoals, awayGoals),
+                Winner = winner,
+                IsCompleted = true
+            }, ct);
+        }
+
+        await uow.CommitAsync(ct);
+        var fresh = await matches.GetByTournamentAsync(tournamentId, ct);
+        return OperationResult<List<MatchDto>>.Ok(fresh.Where(m => m.Round == 0).ToList());
+    }
+
+    public async Task<OperationResult<List<GroupStandingDto>>> GetStandingsAsync(string tournamentId, CancellationToken ct = default)
+    {
+        if (await tournaments.GetByIdAsync(tournamentId, ct) is null)
+            return OperationResult<List<GroupStandingDto>>.NotFound($"Tournament '{tournamentId}' not found.");
+
+        var tournamentGroups = await groups.GetByTournamentAsync(tournamentId, ct);
+        var all = await matches.GetByTournamentAsync(tournamentId, ct);
+        return OperationResult<List<GroupStandingDto>>.Ok(BuildStandings(tournamentGroups, all));
+    }
+
+    public async Task<OperationResult<ChampionDto>> PlayKnockoutAsync(string tournamentId, CancellationToken ct = default)
+    {
+        await using var scope = await uow.BeginAsync(ct);
+
+        try
+        {
+            if (await tournaments.GetByIdAsync(tournamentId, ct) is null)
+                return OperationResult<ChampionDto>.NotFound($"Tournament '{tournamentId}' not found.");
+
+            var all = await matches.GetByTournamentAsync(tournamentId, ct);
+            var knockout = all.Where(m => m.Round > 0).ToList();
+            if (knockout.Count > 0)
+                return FinishedChampion(knockout);
+
+            var groupMatches = all.Where(m => m.Round == 0).ToList();
+            if (groupMatches.Count == 0)
+                return OperationResult<ChampionDto>.Conflict("Create the group matches first.");
+            if (groupMatches.Any(m => !m.IsCompleted))
+                return OperationResult<ChampionDto>.Conflict("Group matches are still pending.");
+
+            var tournamentGroups = await groups.GetByTournamentAsync(tournamentId, ct);
+            var standings = BuildStandings(tournamentGroups, groupMatches);
+            var qualifiers = standings
+                .SelectMany(group => group.Table.Take(2))
+                .OrderByDescending(row => row.Wins)
+                .ThenByDescending(row => row.GoalsFor)
+                .ThenBy(row => row.GoalsAgainst)
+                .ThenBy(row => row.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (qualifiers.Count == 0)
+                return OperationResult<ChampionDto>.Conflict("There are no teams to advance.");
+
+            var names = tournamentGroups
+                .SelectMany(g => g.Teams)
+                .GroupBy(t => t.Id)
+                .ToDictionary(g => g.Key, g => g.First().Name);
+
+            var seeds = qualifiers.Select(row => row.TeamId).ToList();
+            var rounds = new List<KnockoutRoundDto>();
+            var round = 1;
+
+            while (seeds.Count > 1)
+            {
+                var pairs = TournamentServices.Domain.KnockoutPairing.Pair(seeds);
+                var next = new List<string>();
+                var roundMatches = new List<MatchDto>();
+
+                foreach (var (homeId, awayId) in pairs)
+                {
+                    if (awayId is null)
+                    {
+                        next.Add(homeId);
+                        continue;
+                    }
+
+                    var (homeGoals, awayGoals) = TournamentServices.Domain.KnockoutScore.Play(Random.Shared);
+                    var winner = homeGoals > awayGoals ? MatchWinner.HOME : MatchWinner.VISITOR;
+                    var match = new MatchDto(
+                        $"mtc-{Guid.NewGuid().ToString("N")[..8]}",
+                        tournamentId,
+                        null,
+                        homeId,
+                        awayId,
+                        null,
+                        null,
+                        new ScoreDto(homeGoals, awayGoals),
+                        winner,
+                        true,
+                        round);
+
+                    var saved = await matches.AddAsync(match, ct);
+                    roundMatches.Add(saved);
+                    next.Add(winner == MatchWinner.HOME ? homeId : awayId);
+                }
+
+                if (next.Count >= seeds.Count)
+                    return OperationResult<ChampionDto>.Conflict("Knockout pairing did not reduce the field.");
+
+                if (roundMatches.Count > 0)
+                    rounds.Add(new KnockoutRoundDto(round, roundMatches));
+
+                seeds = next;
+                round++;
+            }
+
+            await uow.CommitAsync(ct);
+            return OperationResult<ChampionDto>.Ok(new ChampionDto(seeds[0], names[seeds[0]], rounds));
+        }
+        catch
+        {
+            await uow.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    private static OperationResult<ChampionDto> FinishedChampion(List<MatchDto> knockout)
+    {
+        var lastRound = knockout.Max(m => m.Round);
+        var final = knockout.Where(m => m.Round == lastRound).ToList();
+        if (final.Count != 1 || final[0].Winner is null)
+            return OperationResult<ChampionDto>.Conflict("Knockout is incomplete.");
+
+        var match = final[0];
+        var winnerId = match.Winner == MatchWinner.HOME ? match.HomeTeamId : match.VisitorTeamId;
+        var winnerName = match.Winner == MatchWinner.HOME ? match.HomeTeam?.Name : match.VisitorTeam?.Name;
+        var rounds = knockout
+            .GroupBy(m => m.Round)
+            .OrderBy(g => g.Key)
+            .Select(g => new KnockoutRoundDto(g.Key, g.ToList()))
+            .ToList();
+
+        return OperationResult<ChampionDto>.Ok(new ChampionDto(winnerId, winnerName ?? winnerId, rounds));
+    }
+
+    private static List<GroupStandingDto> BuildStandings(List<GroupDto> tournamentGroups, List<MatchDto> matches)
+    {
+        var tables = new List<GroupStandingDto>();
+        foreach (var group in tournamentGroups.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            var played = matches
+                .Where(m => m.Round == 0 && m.IsCompleted && m.GroupId == group.Id)
+                .Select(m => (m.HomeTeamId, m.Score.HomeTeamScore, m.VisitorTeamId, m.Score.VisitorTeamScore))
+                .ToList();
+
+            var rows = TournamentServices.Domain.Standings.Rank(group.Teams.Select(t => (t.Id, t.Name)).ToList(), played)
+                .Select(row => new StandingRowDto(row.TeamId, row.Name, row.Wins, row.GoalsFor, row.GoalsAgainst))
+                .ToList();
+
+            tables.Add(new GroupStandingDto(group.Id, group.Name, rows));
+        }
+
+        return tables;
     }
 
     private static MatchDto BuildMatch(string tournamentId, string? groupId, string homeTeamId, string visitorTeamId) =>

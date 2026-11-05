@@ -21,9 +21,6 @@ public class CreateTournamentDtoValidator : AbstractValidator<CreateTournamentDt
 
             RuleFor(x => x.Format.NumberOfGroups)
                 .GreaterThan(0).WithMessage("Number of groups must be greater than 0.");
-
-            RuleFor(x => x.Format.Type)
-                .IsInEnum().WithMessage("Invalid tournament format type.");
         });
     }
 }

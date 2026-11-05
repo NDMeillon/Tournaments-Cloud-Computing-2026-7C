@@ -66,6 +66,11 @@ namespace TournamentServices.Infrastructure.Migrations
                     b.Property<bool>("IsCompleted")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("Round")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("TournamentId")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -127,11 +132,6 @@ namespace TournamentServices.Infrastructure.Migrations
 
                     b.Property<int>("NumberOfGroups")
                         .HasColumnType("integer");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
 
                     b.HasKey("Id");
 

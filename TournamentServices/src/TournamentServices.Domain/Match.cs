@@ -7,6 +7,7 @@ public class Match
     public string? GroupId { get; set; }
     public string HomeTeamId { get; set; } = "";
     public string VisitorTeamId { get; set; } = "";
+    public int Round { get; set; }
     public Score Score { get; set; } = new();
     public bool IsCompleted { get; set; }
 

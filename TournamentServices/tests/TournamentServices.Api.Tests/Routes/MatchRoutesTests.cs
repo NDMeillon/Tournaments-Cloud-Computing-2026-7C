@@ -164,7 +164,7 @@ public class MatchRoutesTests : IClassFixture<TournamentApiFactory>, IAsyncLifet
     {
         var response = await _client.PostAsJsonAsync(
             "/tournaments",
-            new CreateTournamentDto("Copa", new TournamentFormatDto(4, 2, TournamentType.ROUND_ROBIN)));
+            new CreateTournamentDto("Copa", new TournamentFormatDto(4, 2)));
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         return (await response.Content.ReadFromJsonAsync<TournamentDto>())!;
     }

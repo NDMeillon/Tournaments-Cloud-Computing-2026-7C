@@ -117,8 +117,7 @@ public class TournamentDelegate(
         {
             format = new TournamentFormatDto(
                 dto.Format.MaxTeamsPerGroup ?? format.MaxTeamsPerGroup,
-                dto.Format.NumberOfGroups ?? format.NumberOfGroups,
-                dto.Format.Type ?? format.Type);
+                dto.Format.NumberOfGroups ?? format.NumberOfGroups);
         }
 
         var updated = tournament with

@@ -1,0 +1,15 @@
+# Construye la API actual del repositorio del alumno (net9.0).
+# En una fase posterior, migrar los proyectos a net10.0 y cambiar el runtime a aspnet:10.0.
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /source
+COPY TournamentServices/ ./TournamentServices/
+RUN dotnet publish TournamentServices/src/TournamentServices.Api/TournamentServices.Api.csproj \
+    -c Release -o /publish --no-self-contained
+
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+WORKDIR /app
+COPY --from=build /publish/ ./
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+EXPOSE 8080
+USER $APP_UID
+ENTRYPOINT ["dotnet", "TournamentServices.Api.dll"]

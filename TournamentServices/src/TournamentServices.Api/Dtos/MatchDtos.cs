@@ -24,7 +24,8 @@ public record MatchDto(
     TeamDto? VisitorTeam,
     ScoreDto Score,
     MatchWinner? Winner,
-    bool IsCompleted
+    bool IsCompleted,
+    int Round = 0
 );
 
 public record CreateMatchDto(

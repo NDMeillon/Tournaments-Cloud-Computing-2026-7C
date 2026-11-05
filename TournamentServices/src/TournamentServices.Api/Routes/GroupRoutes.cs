@@ -12,6 +12,8 @@ public static class GroupRoutes
                        .WithTags("Groups");
 
         group.MapGet("", GetGroups);
+        group.MapPost("/generate", GenerateGroups);
+        group.MapPost("/fill", FillGroups);
         group.MapGet("/{groupId}", GetGroupById);
         group.MapPost("", CreateGroup)
              .AddEndpointFilter<ValidationFilter<CreateGroupDto>>();
@@ -94,5 +96,21 @@ public static class GroupRoutes
             return TypedResults.BadRequest("Invalid ID format in route parameters.");
 
         return RouteSupport.From(await groups.AssignTeamsAsync(tournamentId, groupId, request, ct), _ => TypedResults.NoContent());
+    }
+
+    private static async Task<IResult> GenerateGroups(string tournamentId, IGroupDelegate groups, CancellationToken ct)
+    {
+        if (!RouteSupport.IsValidId(tournamentId))
+            return TypedResults.BadRequest("Invalid Tournament ID format.");
+
+        return RouteSupport.From(await groups.GenerateAsync(tournamentId, ct), TypedResults.Ok);
+    }
+
+    private static async Task<IResult> FillGroups(string tournamentId, IGroupDelegate groups, CancellationToken ct)
+    {
+        if (!RouteSupport.IsValidId(tournamentId))
+            return TypedResults.BadRequest("Invalid Tournament ID format.");
+
+        return RouteSupport.From(await groups.FillAsync(tournamentId, ct), TypedResults.Ok);
     }
 }

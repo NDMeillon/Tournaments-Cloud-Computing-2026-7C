@@ -1,0 +1,66 @@
+# PostgreSQL 16 para el modelo relacional de EF Core del proyecto del alumno.
+# No usar db_script.sql del profesor: su esquema es UUID + JSONB y es incompatible.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tournament-db
+  namespace: tournaments
+spec:
+  selector:
+    app: tournament-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tournament-db
+  namespace: tournaments
+spec:
+  serviceName: tournament-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tournament-db
+  template:
+    metadata:
+      labels:
+        app: tournament-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: tournament_db
+            - name: POSTGRES_USER
+              value: tournament_svc
+            - name: POSTGRES_PASSWORD
+              value: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U tournament_svc -d tournament_db
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi

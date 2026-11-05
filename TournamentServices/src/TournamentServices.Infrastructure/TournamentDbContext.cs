@@ -31,7 +31,6 @@ public class TournamentDbContext(DbContextOptions<TournamentDbContext> options) 
             {
             format.Property(f => f.MaxTeamsPerGroup).HasColumnName("MaxTeamsPerGroup");
             format.Property(f => f.NumberOfGroups).HasColumnName("NumberOfGroups");
-            format.Property(f => f.Type).HasColumnName("Type").HasConversion<string>().HasMaxLength(32);
             });            
             entity.HasMany(t => t.Groups)
                 .WithOne(g => g.Tournament)
@@ -73,6 +72,7 @@ public class TournamentDbContext(DbContextOptions<TournamentDbContext> options) 
             entity.Property(m => m.GroupId).HasMaxLength(64);
             entity.Property(m => m.HomeTeamId).HasMaxLength(64);
             entity.Property(m => m.VisitorTeamId).HasMaxLength(64);
+            entity.Property(m => m.Round).HasDefaultValue(0);
             entity.Ignore(m => m.Winner);
             entity.OwnsOne(m => m.Score, score =>
             {

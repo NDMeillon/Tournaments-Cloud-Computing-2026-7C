@@ -1,24 +1,13 @@
-using System.Text.Json.Serialization;
-
 namespace TournamentServices.Api.Dtos;
-
-[JsonConverter(typeof(JsonStringEnumConverter))]
-public enum TournamentType
-{
-    ROUND_ROBIN,
-    NFL
-}
 
 public record TournamentFormatDto(
     int MaxTeamsPerGroup,
-    int NumberOfGroups,
-    TournamentType Type
+    int NumberOfGroups
 );
 
 public record PatchTournamentFormatDto(
     int? MaxTeamsPerGroup = null,
-    int? NumberOfGroups = null,
-    TournamentType? Type = null
+    int? NumberOfGroups = null
 );
 
 public record TournamentDto(
@@ -44,6 +33,13 @@ public record PatchTournamentDto(
     PatchTournamentFormatDto? Format = null
 );
 
-// Legacy
+public record StandingRowDto(string TeamId, string Name, int Wins, int GoalsFor, int GoalsAgainst);
+
+public record GroupStandingDto(string GroupId, string GroupName, List<StandingRowDto> Table);
+
+public record KnockoutRoundDto(int Round, List<MatchDto> Matches);
+
+public record ChampionDto(string TeamId, string Name, List<KnockoutRoundDto> Rounds);
+
 public record CreateTournamentRequest(string Id, string Name, DateTime StartDate);
 public record TournamentResponse(string Id, string Name, DateTime StartDate, List<GroupResponse> Groups);

@@ -36,7 +36,7 @@ dotnet ef database update --project src/TournamentServices.Infrastructure --star
 dotnet run --project src/TournamentServices.Api
 ```
 
-La API queda en `http://localhost:8080`. La raíz muestra el estado y `/swagger` permite probar los endpoints. `GET /health` responde `Services running`.
+La API queda en `http://localhost:8080`. La raíz es la simulación del Mundial: crear torneo, grupos, equipos, partidos en 0-0, fase de grupos y eliminatoria hasta un campeón. `/swagger` lista el contrato. `GET /health` responde `Services running`.
 
 En este repositorio, cada `git commit` ejecuta `dotnet test` con el hook `scripts/pre-commit`. En GitHub, el workflow `.github/workflows/tests.yml` vuelve a correrlos en cada push.
 
@@ -73,8 +73,14 @@ Los cuerpos son `application/json`. Los ids cumplen `^[A-Za-z0-9\-]+$`.
 | `GET/POST` | `/tournaments` | `200`, `201`, `400` |
 | `GET/PUT/PATCH/DELETE` | `/tournaments/{tournamentId}` | `200`, `204`, `400`, `404` |
 | `GET/POST` | `/tournaments/{tournamentId}/groups` | `200`, `201`, `400`, `404`, `422` |
+| `POST` | `/tournaments/{tournamentId}/groups/generate` | `200`, `404` |
+| `POST` | `/tournaments/{tournamentId}/groups/fill` | `200`, `404`, `422` |
 | `GET/PUT/DELETE` | `/tournaments/{tournamentId}/groups/{groupId}` | `200`, `204`, `400`, `404` |
 | `PATCH` | `/tournaments/{tournamentId}/groups/{groupId}/teams` | `204`, `400`, `404`, `422` |
 | `GET/POST` | `/tournaments/{tournamentId}/matches` | `200`, `201`, `400`, `404`, `422` |
+| `POST` | `/tournaments/{tournamentId}/matches/generate` | `200`, `404`, `422` |
+| `POST` | `/tournaments/{tournamentId}/matches/simulate` | `200`, `404`, `422` |
+| `GET` | `/tournaments/{tournamentId}/standings` | `200`, `404` |
+| `POST` | `/tournaments/{tournamentId}/knockout` | `200`, `404`, `422` |
 | `GET/DELETE` | `/tournaments/{tournamentId}/matches/{matchId}` | `200`, `204`, `400`, `404` |
 | `PATCH` | `/tournaments/{tournamentId}/matches/{matchId}/score` | `200`, `400`, `404` |

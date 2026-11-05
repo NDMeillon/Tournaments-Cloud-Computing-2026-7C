@@ -12,6 +12,8 @@ public static class MatchRoutes
                        .WithTags("Matches");
 
         group.MapGet("", GetMatches);
+        group.MapPost("/generate", GenerateMatches);
+        group.MapPost("/simulate", SimulateMatches);
         group.MapGet("/{matchId}", GetMatchById);
         group.MapPost("", CreateMatch)
              .AddEndpointFilter<ValidationFilter<CreateMatchDto>>();
@@ -79,5 +81,21 @@ public static class MatchRoutes
             return TypedResults.BadRequest("Invalid ID format.");
 
         return RouteSupport.From(await matches.DeleteAsync(tournamentId, matchId, ct), _ => TypedResults.NoContent());
+    }
+
+    private static async Task<IResult> GenerateMatches(string tournamentId, IMatchDelegate matches, CancellationToken ct)
+    {
+        if (!RouteSupport.IsValidId(tournamentId))
+            return TypedResults.BadRequest("Invalid Tournament ID format.");
+
+        return RouteSupport.From(await matches.GenerateRoundRobinAsync(tournamentId, ct), TypedResults.Ok);
+    }
+
+    private static async Task<IResult> SimulateMatches(string tournamentId, IMatchDelegate matches, CancellationToken ct)
+    {
+        if (!RouteSupport.IsValidId(tournamentId))
+            return TypedResults.BadRequest("Invalid Tournament ID format.");
+
+        return RouteSupport.From(await matches.SimulateGroupMatchesAsync(tournamentId, ct), TypedResults.Ok);
     }
 }

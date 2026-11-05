@@ -13,6 +13,8 @@ public static class TournamentRoutes
                        .WithTags("Tournaments");
 
         group.MapGet("", GetAllTournaments);
+        group.MapGet("/{tournamentId}/standings", GetStandings);
+        group.MapPost("/{tournamentId}/knockout", PlayKnockout);
         group.MapGet("/{tournamentId}", GetTournamentById);
         group.MapPost("", CreateTournament)
              .AddEndpointFilter<ValidationFilter<CreateTournamentDto>>();
@@ -72,5 +74,21 @@ public static class TournamentRoutes
             return TypedResults.BadRequest("Invalid Tournament ID format.");
 
         return RouteSupport.From(await tournaments.DeleteAsync(tournamentId, ct), _ => TypedResults.NoContent());
+    }
+
+    private static async Task<IResult> GetStandings(string tournamentId, IMatchDelegate matches, CancellationToken ct)
+    {
+        if (!RouteSupport.IsValidId(tournamentId))
+            return TypedResults.BadRequest("Invalid Tournament ID format.");
+
+        return RouteSupport.From(await matches.GetStandingsAsync(tournamentId, ct), TypedResults.Ok);
+    }
+
+    private static async Task<IResult> PlayKnockout(string tournamentId, IMatchDelegate matches, CancellationToken ct)
+    {
+        if (!RouteSupport.IsValidId(tournamentId))
+            return TypedResults.BadRequest("Invalid Tournament ID format.");
+
+        return RouteSupport.From(await matches.PlayKnockoutAsync(tournamentId, ct), TypedResults.Ok);
     }
 }

@@ -26,7 +26,7 @@ El servicio ya administra un torneo de punta a punta: equipos, grupos, partidos 
 Cuatro recursos:
 
 - **Equipo:** `id` y `name`. El nombre no se repite.
-- **Torneo:** nombre y formato (`maxTeamsPerGroup`, `numberOfGroups`, tipo `ROUND_ROBIN` o `NFL`).
+- **Torneo:** nombre y formato (`maxTeamsPerGroup`, `numberOfGroups`). Es un Mundial: fase de grupos y luego eliminatoria hasta un campeón.
 - **Grupo:** pertenece a un torneo y recibe equipos hasta el máximo del formato.
 - **Partido:** local y visita. Si trae grupo, ambos equipos tienen que estar en ese grupo. Al anotar, el ganador es `HOME`, `VISITOR` o vacío si empatan. Un marcador negativo se rechaza.
 
@@ -75,7 +75,7 @@ Las reglas de grupos y partidos están escritas dos veces. El delegado las aplic
 2. **Unir las reglas al dominio** para que el delegado llame a `AddGroup`, `AssignTeams` y `Match.Create` en lugar de repetir la regla.
 3. **Proyectos de prueba que el enunciado nombra y no existen:** `TournamentServices.Delegates.Tests` y `TournamentServices.Repositories.Tests`.
 4. **Umbral de cobertura en el pipeline.** El enunciado pide `dotnet test --collect:"XPlat Code Coverage"` con mínimos (rutas 100 %, delegados 90 %, repositorios 80 %, dominio 100 % de la lógica). Jenkins y GitHub Actions ejecutan las pruebas sin ese umbral.
-5. **`ROUND_ROBIN` y `NFL` se guardan y se pueden cambiar con PATCH.** No cambian el calendario. `CreateWithGroupsAsync` arma grupos A, B, C… y no está publicado en ninguna ruta.
+5. **La simulación es solo de Mundial.** Crear grupos, llenarlos, generar todos los partidos en 0-0, simular la fase de grupos y ordenar por victorias, goles a favor, goles en contra y nombre. Los dos primeros de cada grupo se emparejan y se vuelven a emparejar, siempre con un ganador, hasta que queda un campeón.
 6. **Marco de trabajo mezclado.** El enunciado pide .NET 10 o superior. Api, Domain e Infrastructure apuntan a `net9.0`. El proyecto de pruebas de la API apunta a `net10.0`.
 
 El enunciado deja para después, y conviene decirlo en voz alta: autenticación (401/403), eventos al crear o borrar un torneo, y una prueba de peticiones en paralelo.
@@ -144,12 +144,13 @@ El servicio genera los ids (`trn-…`, `team-…`, `grp-…`, `match-…`). La p
 
 | Paso | Botón | Qué tiene que verse a la derecha |
 | :--- | :--- | :--- |
-| 1 | **Crear torneo** | **201**. Nombre `Copa Demo`, 4 equipos por grupo, 2 grupos, `ROUND_ROBIN`. El id del torneo se rellena solo. |
-| 2 | **Crear equipo** y luego **Crear Brasil** | **201** por cada uno. Los selectores de local y visita quedan en Mexico y Brasil. |
-| 3 | **Crear grupo** | **201**. Nombre `Grupo A`. |
-| 4 | **Asignar estos dos** | **204**, sin cuerpo. |
-| 5 | **Crear partido** | **201**. Marcador 0-0, sin ganador, `isCompleted` en false. |
-| 6 | **Guardar marcador** | **200**. Goles 2 y 1, `winner` igual a `HOME`, `isCompleted` en true. |
+| 1 | **Crear torneo** | Nombre, equipos por grupo y cantidad de grupos. Por defecto, 8 grupos de 4. |
+| 2 | **Crear grupos** | Aparecen Grupo A, Grupo B, … |
+| 3 | **Llenar grupos** | Cada grupo queda con sus equipos. |
+| 4 | **Crear partidos** | Todos los cruces del grupo, marcador 0-0. |
+| 5 | **Simular grupos** | Marcadores al azar. |
+| 6 | **Ver tabla** | Orden: victorias, goles a favor, goles en contra, nombre. |
+| 7 | **Jugar eliminatoria** | Los dos primeros de cada grupo se emparejan. Cada partido tiene ganador. Los ganadores se vuelven a emparejar hasta que queda uno. |
 
 **Ver el torneo completo** hace `GET /tournaments/{id}` y muestra el grupo, los equipos y el partido jugado.
 

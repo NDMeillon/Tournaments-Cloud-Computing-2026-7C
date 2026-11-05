@@ -25,4 +25,8 @@ public interface IGroupDelegate
     /// - un equipo no puede estar en dos grupos del mismo torneo
     /// </summary>
     Task<OperationResult<GroupDto>> AssignTeamsAsync(string tournamentId, string groupId, AssignTeamsDto dto, CancellationToken ct = default);
+
+    Task<OperationResult<List<GroupDto>>> GenerateAsync(string tournamentId, CancellationToken ct = default);
+
+    Task<OperationResult<List<GroupDto>>> FillAsync(string tournamentId, CancellationToken ct = default);
 }
