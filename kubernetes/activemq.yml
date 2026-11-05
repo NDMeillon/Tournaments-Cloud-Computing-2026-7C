@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: artemis
+  namespace: tournaments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: artemis
+  template:
+    metadata:
+      labels:
+        app: artemis
+    spec:
+      containers:
+      - name: artemis
+        image: apache/activemq-classic:latest
+        ports:
+        - containerPort: 61616
+        - containerPort: 8161
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: artemis
+  namespace: tournaments
+spec:
+  selector:
+    app: artemis
+  ports:
+  - name: tcp-openwire
+    port: 61616
+    targetPort: 61616
+  - name: http-console
+    port: 8161
+    targetPort: 8161
